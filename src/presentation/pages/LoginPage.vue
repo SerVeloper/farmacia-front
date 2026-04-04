@@ -9,8 +9,9 @@ const route = useRoute();
 const router = useRouter();
 
 const form = reactive({
-  email: 'admin@farmacia.local',
-  password: 'admin1234',
+  email: '',
+  password: '',
+  rememberMe: false,
 });
 
 const submitting = ref(false);
@@ -75,6 +76,22 @@ async function submitLogin() {
                 />
               </label>
 
+              <label class="flex items-center gap-2 text-sm text-slate-300">
+                <input
+                  v-model="form.rememberMe"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-white/20 bg-slate-900/60"
+                />
+                Recordarme por 15 dias
+              </label>
+
+              <RouterLink
+                to="/password/forgot"
+                class="inline-flex text-sm text-cyan-200 transition hover:text-cyan-100"
+              >
+                Olvide mi contrasena
+              </RouterLink>
+
               <button
                 type="submit"
                 :disabled="submitting"
@@ -83,10 +100,6 @@ async function submitLogin() {
                 {{ submitting ? 'Validando...' : 'Entrar al sistema' }}
               </button>
             </form>
-
-            <div class="rounded-xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-xs text-cyan-100">
-              Credenciales iniciales por defecto: admin@farmacia.local / admin1234
-            </div>
           </div>
         </section>
       </div>

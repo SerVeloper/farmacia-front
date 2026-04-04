@@ -32,6 +32,24 @@ const router = createRouter({
       },
     },
     {
+      path: '/password/forgot',
+      name: 'password-forgot',
+      component: () => import('@/presentation/pages/ForgotPasswordPage.vue'),
+      meta: {
+        publicOnly: true,
+        layout: 'auth',
+      },
+    },
+    {
+      path: '/password/reset',
+      name: 'password-reset',
+      component: () => import('@/presentation/pages/ResetPasswordPage.vue'),
+      meta: {
+        publicOnly: true,
+        layout: 'auth',
+      },
+    },
+    {
       path: '/',
       name: 'home',
       component: () => import('@/presentation/pages/HomePage.vue'),
@@ -195,9 +213,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const authStore = useAuthStore();
 
-  if (authStore.token && !authStore.user) {
-    await authStore.refreshProfile();
-  }
+  await authStore.initializeSession();
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return {
