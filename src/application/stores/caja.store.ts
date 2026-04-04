@@ -27,6 +27,7 @@ export const useCajaStore = defineStore('caja', () => {
 
   const currentCajas = ref<Caja[]>([]);
   const salesSummary = ref<CajaSalesSummaryResponse>(EMPTY_SUMMARY);
+  const lastClosedCaja = ref<Caja | null>(null);
 
   const loadingCurrent = ref(false);
   const loadingSummary = ref(false);
@@ -59,6 +60,14 @@ export const useCajaStore = defineStore('caja', () => {
       ]);
       currentCajas.value = cajas;
       salesSummary.value = summary;
+
+      const currentUserBox = cajas.find(
+        (caja) => caja.usuarioAperturaId === authStore.user?.id,
+      );
+
+      if (currentUserBox) {
+        lastClosedCaja.value = null;
+      }
     } catch (error: any) {
       const message =
         error.response?.data?.message || 'No se pudo cargar el estado de caja';
@@ -72,7 +81,12 @@ export const useCajaStore = defineStore('caja', () => {
   async function openCaja(dto: OpenCajaDto) {
     submittingAction.value = true;
     try {
-      await cajasApi.open(dto);
+      const opened = await cajasApi.open(dto);
+      currentCajas.value = [
+        opened,
+        ...currentCajas.value.filter((caja) => caja.id !== opened.id),
+      ];
+      lastClosedCaja.value = null;
       toast.success('Caja abierta correctamente');
       await refreshDashboard(dto.sucursalId);
     } catch (error: any) {
@@ -88,7 +102,9 @@ export const useCajaStore = defineStore('caja', () => {
   async function closeCaja(cajaId: string, dto: CloseCajaDto, sucursalId: string) {
     submittingAction.value = true;
     try {
-      await cajasApi.close(cajaId, dto);
+      const closed = await cajasApi.close(cajaId, dto);
+      currentCajas.value = currentCajas.value.filter((caja) => caja.id !== cajaId);
+      lastClosedCaja.value = closed;
       toast.success('Caja cerrada correctamente');
       await refreshDashboard(sucursalId);
     } catch (error: any) {
@@ -120,7 +136,12 @@ export const useCajaStore = defineStore('caja', () => {
   async function reopenCaja(cajaId: string, sucursalId: string) {
     submittingAction.value = true;
     try {
-      await cajasApi.reopen(cajaId);
+      const reopened = await cajasApi.reopen(cajaId);
+      currentCajas.value = [
+        reopened,
+        ...currentCajas.value.filter((caja) => caja.id !== reopened.id),
+      ];
+      lastClosedCaja.value = null;
       toast.success('Caja reaperturada correctamente');
       await refreshDashboard(sucursalId);
     } catch (error: any) {
@@ -143,6 +164,7 @@ export const useCajaStore = defineStore('caja', () => {
     hasOpenCaja,
     hasPausedCaja,
     hasOperativeCaja,
+    lastClosedCaja,
     refreshDashboard,
     openCaja,
     closeCaja,

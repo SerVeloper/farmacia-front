@@ -48,6 +48,9 @@ const cajaStatusClass = computed(() => {
 });
 
 const currentCaja = computed(() => cajaStore.myCurrentCaja);
+const canReopenClosedCaja = computed(
+  () => cajaStore.lastClosedCaja?.estado === 'cerrada',
+);
 
 const sucursalName = computed(() => {
   const sucursal = sucursalStore.sucursales.find(
@@ -107,9 +110,13 @@ async function handlePauseCaja() {
 }
 
 async function handleReopenCaja() {
-  if (!selectedSucursalId.value || !currentCaja.value) return;
+  if (!selectedSucursalId.value) return;
 
-  await cajaStore.reopenCaja(currentCaja.value.id, selectedSucursalId.value);
+  const targetCajaId = currentCaja.value?.id || cajaStore.lastClosedCaja?.id;
+
+  if (!targetCajaId) return;
+
+  await cajaStore.reopenCaja(targetCajaId, selectedSucursalId.value);
 }
 
 function formatMoney(value: number) {
@@ -190,7 +197,7 @@ function formatDate(dateLike: string | null) {
           </p>
         </div>
 
-         <div v-if="!cajaStore.hasOperativeCaja" class="flex items-end gap-2">
+         <div v-if="!cajaStore.hasOperativeCaja && !canReopenClosedCaja" class="flex items-end gap-2">
           <label class="text-sm font-medium text-[var(--color-text-primary)]">
             Monto de apertura
             <input
@@ -212,21 +219,21 @@ function formatDate(dateLike: string | null) {
 
         <div v-else class="flex gap-2">
           <button
+            v-if="cajaStore.hasPausedCaja || canReopenClosedCaja"
+            class="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+            :disabled="cajaStore.submittingAction"
+            @click="handleReopenCaja"
+          >
+            Reaperturar caja
+          </button>
+
+          <button
             v-if="cajaStore.hasOpenCaja"
             class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"
             :disabled="cajaStore.submittingAction"
             @click="handlePauseCaja"
           >
             Pausar caja
-          </button>
-
-          <button
-            v-if="cajaStore.hasPausedCaja"
-            class="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
-            :disabled="cajaStore.submittingAction"
-            @click="handleReopenCaja"
-          >
-            Reaperturar caja
           </button>
 
           <button
