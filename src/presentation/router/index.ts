@@ -110,16 +110,10 @@ const router = createRouter({
       meta: secureMeta({ modulo: 'ventas', accion: 'ver' }, 'Cotizacion'),
     },
     {
-      path: '/caja/inicio',
-      name: 'caja-inicio',
-      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
-      meta: secureMeta({ modulo: 'caja', accion: 'ver' }, 'Inicio de caja'),
-    },
-    {
-      path: '/caja/cierre',
-      name: 'caja-cierre',
-      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
-      meta: secureMeta({ modulo: 'caja', accion: 'ver' }, 'Cierre de caja'),
+      path: '/caja',
+      name: 'caja',
+      component: () => import('@/presentation/pages/CajaPage.vue'),
+      meta: secureMeta({ modulo: 'caja', accion: 'ver' }, 'Caja'),
     },
     {
       path: '/reportes/compras',
@@ -197,11 +191,19 @@ const router = createRouter({
     },
     {
       path: '/caja/apertura',
-      redirect: '/caja/inicio',
+      redirect: '/caja',
     },
     {
       path: '/caja/movimientos',
-      redirect: '/caja/inicio',
+      redirect: '/caja',
+    },
+    {
+      path: '/caja/inicio',
+      redirect: '/caja',
+    },
+    {
+      path: '/caja/cierre',
+      redirect: '/caja',
     },
     {
       path: '/reportes/caja',
