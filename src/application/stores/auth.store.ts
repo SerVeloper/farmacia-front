@@ -2,25 +2,47 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
 import { authApi } from '@/infrastructure/api/auth.api';
+import { setAuthClientHandlers } from '@/infrastructure/api/client';
 import { useToastStore } from '@/application/stores/toast.store';
-import type { LoginDto } from '@/domain/types/auth';
+import type {
+  ForgotPasswordDto,
+  LoginDto,
+  ResetPasswordDto,
+} from '@/domain/types/auth';
 import type { AclAction, AclModule } from '@/domain/types/acl';
 import { hasAclPermission } from '@/domain/types/acl';
 import { getRoleLabel, normalizeUserRole, type User, type UserRole } from '@/domain/types/user';
 
-const AUTH_TOKEN_KEY = 'farmacia_token';
 const AUTH_USER_KEY = 'farmacia_user';
 
 export const useAuthStore = defineStore('auth', () => {
   const toast = useToastStore();
 
-  const token = ref<string | null>(localStorage.getItem(AUTH_TOKEN_KEY));
+  const token = ref<string | null>(null);
   const user = ref<User | null>(readStoredUser());
+  const initialized = ref(false);
   const loading = ref(false);
 
   const isAuthenticated = computed(() => Boolean(token.value && user.value));
   const normalizedRole = computed(() => normalizeUserRole(user.value?.rol));
   const roleLabel = computed(() => getRoleLabel(user.value?.rol));
+
+  setAuthClientHandlers({
+    getAccessToken: () => token.value,
+    refreshSession: async () => {
+      try {
+        const response = await authApi.refresh();
+        token.value = response.accessToken;
+        return token.value;
+      } catch {
+        clearLocalSession();
+        return null;
+      }
+    },
+    onUnauthorized: () => {
+      clearLocalSession();
+    },
+  });
 
   async function login(dto: LoginDto) {
     loading.value = true;
@@ -28,8 +50,8 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await authApi.login(dto);
       token.value = response.accessToken;
       user.value = response.user;
+      initialized.value = true;
 
-      localStorage.setItem(AUTH_TOKEN_KEY, response.accessToken);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(response.user));
       toast.success(`Bienvenido, ${response.user.nombre}`);
     } catch (error: any) {
@@ -42,26 +64,65 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function refreshProfile() {
-    if (!token.value) return;
+    if (!token.value) {
+      return;
+    }
 
     try {
       const profile = await authApi.me();
       user.value = profile;
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(profile));
     } catch {
-      logout(false);
+      clearLocalSession();
     }
   }
 
-  function logout(showToast = true) {
-    token.value = null;
-    user.value = null;
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_USER_KEY);
+  async function initializeSession() {
+    if (initialized.value) {
+      return;
+    }
+
+    initialized.value = true;
+
+    try {
+      const refreshResponse = await authApi.refresh();
+      token.value = refreshResponse.accessToken;
+      await refreshProfile();
+    } catch {
+      clearLocalSession();
+    }
+  }
+
+  async function logout(showToast = true) {
+    clearLocalSession();
+
+    try {
+      await authApi.logout();
+    } catch {
+      // noop
+    }
 
     if (showToast) {
       toast.info('Sesion cerrada');
     }
+  }
+
+  async function forgotPassword(dto: ForgotPasswordDto) {
+    const response = await authApi.forgotPassword(dto);
+    toast.info(response.message);
+    return response;
+  }
+
+  async function resetPassword(dto: ResetPasswordDto) {
+    const response = await authApi.resetPassword(dto);
+    toast.success(response.message);
+    return response;
+  }
+
+  function clearLocalSession() {
+    token.value = null;
+    user.value = null;
+    localStorage.removeItem(AUTH_USER_KEY);
   }
 
   function hasRole(roles: UserRole[]) {
@@ -90,9 +151,13 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     normalizedRole,
     roleLabel,
+    initialized,
     login,
+    initializeSession,
     refreshProfile,
     logout,
+    forgotPassword,
+    resetPassword,
     hasRole,
     canAccess,
   };

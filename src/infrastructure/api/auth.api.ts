@@ -1,5 +1,11 @@
 import apiClient from '@/infrastructure/api/client';
-import type { LoginDto, LoginResponse } from '@/domain/types/auth';
+import type {
+  ForgotPasswordDto,
+  LoginDto,
+  LoginResponse,
+  RefreshResponse,
+  ResetPasswordDto,
+} from '@/domain/types/auth';
 import type { User } from '@/domain/types/user';
 import { normalizeUserRole } from '@/domain/types/user';
 
@@ -25,5 +31,32 @@ export const authApi = {
   async me(): Promise<User> {
     const { data } = await apiClient.get<User>('/auth/me');
     return normalizeAuthUser(data);
+  },
+
+  async refresh(): Promise<RefreshResponse> {
+    const { data } = await apiClient.post<RefreshResponse>('/auth/refresh', {});
+    return data;
+  },
+
+  async logout(): Promise<void> {
+    await apiClient.post('/auth/logout', {});
+  },
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const { data } = await apiClient.post<{ message: string }>(
+      '/auth/password/forgot',
+      dto,
+    );
+
+    return data;
+  },
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const { data } = await apiClient.post<{ message: string }>(
+      '/auth/password/reset',
+      dto,
+    );
+
+    return data;
   },
 };
