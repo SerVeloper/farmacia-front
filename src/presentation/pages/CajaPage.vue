@@ -19,7 +19,7 @@ const isPrivileged = computed(
 const selectedSucursalId = ref(authStore.user?.sucursalId || '');
 
 const openForm = reactive({
-  montoApertura: 100,
+  montoApertura: 200,
 });
 
 const closeForm = reactive({
