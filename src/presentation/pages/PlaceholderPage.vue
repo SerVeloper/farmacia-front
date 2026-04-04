@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
 
-const pageTitle = route.name?.toString() || 'Página';
+const pageTitle = computed(
+  () => (route.meta.pageTitle as string | undefined) ?? route.name?.toString() ?? 'Pagina',
+);
 </script>
 
 <template>

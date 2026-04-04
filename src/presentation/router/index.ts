@@ -1,7 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 import { useAuthStore } from '@/application/stores/auth.store';
-import type { UserRole } from '@/domain/types/user';
+import type { AclPermission } from '@/domain/types/acl';
+
+type RouteMetaWithAcl = Record<PropertyKey, unknown> & {
+  requiresAuth?: boolean;
+  publicOnly?: boolean;
+  layout?: 'auth';
+  acl?: AclPermission;
+  pageTitle?: string;
+};
+
+function secureMeta(acl: AclPermission, pageTitle?: string): RouteMetaWithAcl {
+  return {
+    requiresAuth: true,
+    acl,
+    pageTitle,
+  };
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -19,43 +35,159 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: () => import('@/presentation/pages/HomePage.vue'),
-      meta: { requiresAuth: true },
+      meta: secureMeta({ modulo: 'inicio', accion: 'ver' }),
     },
     {
-      path: '/usuarios',
-      name: 'usuarios',
-      component: () => import('@/presentation/pages/UsuariosPage.vue'),
-      meta: {
-        requiresAuth: true,
-        roles: ['admin'] as UserRole[],
-      },
+      path: '/inventario/productos',
+      name: 'inventario-productos',
+      component: () => import('@/presentation/pages/ProductosPage.vue'),
+      meta: secureMeta({ modulo: 'inventario', accion: 'ver' }),
     },
     {
-      path: '/sucursales',
-      name: 'sucursales',
+      path: '/inventario/marcas',
+      name: 'inventario-marcas',
+      component: () => import('@/presentation/pages/MarcasPage.vue'),
+      meta: secureMeta({ modulo: 'inventario', accion: 'ver' }),
+    },
+    {
+      path: '/inventario/categorias',
+      name: 'inventario-categorias',
+      component: () => import('@/presentation/pages/CategoriasPage.vue'),
+      meta: secureMeta({ modulo: 'inventario', accion: 'ver' }),
+    },
+    {
+      path: '/compras/compras',
+      name: 'compras-compras',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'compras', accion: 'ver' }, 'Compras'),
+    },
+    {
+      path: '/compras/nueva',
+      name: 'compras-nueva',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'compras', accion: 'ver' }, 'Nueva compra'),
+    },
+    {
+      path: '/compras/ordenes',
+      name: 'compras-ordenes',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'compras', accion: 'ver' }, 'Ordenes de compra'),
+    },
+    {
+      path: '/ventas/ventas',
+      name: 'ventas-ventas',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'ventas', accion: 'ver' }, 'Ventas'),
+    },
+    {
+      path: '/ventas/nueva',
+      name: 'ventas-nueva',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'ventas', accion: 'ver' }, 'Nueva venta'),
+    },
+    {
+      path: '/ventas/cotizacion',
+      name: 'ventas-cotizacion',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'ventas', accion: 'ver' }, 'Cotizacion'),
+    },
+    {
+      path: '/caja/inicio',
+      name: 'caja-inicio',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'caja', accion: 'ver' }, 'Inicio de caja'),
+    },
+    {
+      path: '/caja/cierre',
+      name: 'caja-cierre',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'caja', accion: 'ver' }, 'Cierre de caja'),
+    },
+    {
+      path: '/reportes/compras',
+      name: 'reportes-compras',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'reportes', accion: 'ver' }, 'Reporte de compras'),
+    },
+    {
+      path: '/reportes/ventas',
+      name: 'reportes-ventas',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'reportes', accion: 'ver' }, 'Reporte de ventas'),
+    },
+    {
+      path: '/reportes/inventario',
+      name: 'reportes-inventario',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'reportes', accion: 'ver' }, 'Reporte de inventario'),
+    },
+    {
+      path: '/configuracion/sucursales',
+      name: 'configuracion-sucursales',
       component: () => import('@/presentation/pages/SucursalesPage.vue'),
-      meta: {
-        requiresAuth: true,
-        roles: ['admin'] as UserRole[],
-      },
+      meta: secureMeta({ modulo: 'configuracion', accion: 'ver' }),
+    },
+    {
+      path: '/configuracion/usuarios',
+      name: 'configuracion-usuarios',
+      component: () => import('@/presentation/pages/UsuariosPage.vue'),
+      meta: secureMeta({ modulo: 'configuracion', accion: 'ver' }),
+    },
+    {
+      path: '/configuracion/roles',
+      name: 'configuracion-roles',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'configuracion', accion: 'ver' }, 'Roles'),
+    },
+    {
+      path: '/configuracion/cargos',
+      name: 'configuracion-cargos',
+      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      meta: secureMeta({ modulo: 'configuracion', accion: 'ver' }, 'Cargos'),
     },
     {
       path: '/productos',
-      name: 'productos',
-      component: () => import('@/presentation/pages/ProductosPage.vue'),
-      meta: { requiresAuth: true },
+      redirect: '/inventario/productos',
     },
     {
       path: '/marcas',
-      name: 'marcas',
-      component: () => import('@/presentation/pages/MarcasPage.vue'),
-      meta: { requiresAuth: true },
+      redirect: '/inventario/marcas',
     },
     {
       path: '/categorias',
-      name: 'categorias',
-      component: () => import('@/presentation/pages/CategoriasPage.vue'),
-      meta: { requiresAuth: true },
+      redirect: '/inventario/categorias',
+    },
+    {
+      path: '/usuarios',
+      redirect: '/configuracion/usuarios',
+    },
+    {
+      path: '/sucursales',
+      redirect: '/configuracion/sucursales',
+    },
+    {
+      path: '/compras/proveedores',
+      redirect: '/compras/compras',
+    },
+    {
+      path: '/ventas/pos',
+      redirect: '/ventas/ventas',
+    },
+    {
+      path: '/ventas/historial',
+      redirect: '/ventas/ventas',
+    },
+    {
+      path: '/caja/apertura',
+      redirect: '/caja/inicio',
+    },
+    {
+      path: '/caja/movimientos',
+      redirect: '/caja/inicio',
+    },
+    {
+      path: '/reportes/caja',
+      redirect: '/reportes/ventas',
     },
   ],
 });
@@ -78,10 +210,10 @@ router.beforeEach(async (to) => {
     return { name: 'home' };
   }
 
-  if (to.meta.roles && Array.isArray(to.meta.roles)) {
-    if (!authStore.hasRole(to.meta.roles as UserRole[])) {
+  const acl = to.meta.acl as AclPermission | undefined;
+
+  if (acl && !authStore.canAccess(acl.modulo, acl.accion)) {
       return { name: 'home' };
-    }
   }
 
   return true;

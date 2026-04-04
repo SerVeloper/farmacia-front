@@ -4,7 +4,9 @@ import { computed, ref } from 'vue';
 import { authApi } from '@/infrastructure/api/auth.api';
 import { useToastStore } from '@/application/stores/toast.store';
 import type { LoginDto } from '@/domain/types/auth';
-import type { User, UserRole } from '@/domain/types/user';
+import type { AclAction, AclModule } from '@/domain/types/acl';
+import { hasAclPermission } from '@/domain/types/acl';
+import { getRoleLabel, normalizeUserRole, type User, type UserRole } from '@/domain/types/user';
 
 const AUTH_TOKEN_KEY = 'farmacia_token';
 const AUTH_USER_KEY = 'farmacia_user';
@@ -17,6 +19,8 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false);
 
   const isAuthenticated = computed(() => Boolean(token.value && user.value));
+  const normalizedRole = computed(() => normalizeUserRole(user.value?.rol));
+  const roleLabel = computed(() => getRoleLabel(user.value?.rol));
 
   async function login(dto: LoginDto) {
     loading.value = true;
@@ -62,7 +66,21 @@ export const useAuthStore = defineStore('auth', () => {
 
   function hasRole(roles: UserRole[]) {
     if (!user.value) return false;
-    return roles.includes(user.value.rol);
+
+    const currentRole = user.value.rol;
+    const currentNormalizedRole = normalizeUserRole(currentRole);
+
+    return roles.some((role) => {
+      if (role === currentRole) {
+        return true;
+      }
+
+      return normalizeUserRole(role) === currentNormalizedRole;
+    });
+  }
+
+  function canAccess(modulo: AclModule, accion: AclAction = 'ver') {
+    return hasAclPermission(user.value?.rol, { modulo, accion });
   }
 
   return {
@@ -70,10 +88,13 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     loading,
     isAuthenticated,
+    normalizedRole,
+    roleLabel,
     login,
     refreshProfile,
     logout,
     hasRole,
+    canAccess,
   };
 });
 

@@ -4,28 +4,33 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { useAuthStore } from '@/application/stores/auth.store';
 import { useSucursalStore } from '@/application/stores/sucursal.store';
 import { useUserStore } from '@/application/stores/user.store';
-import type { UserRole } from '@/domain/types/user';
+import {
+  CANONICAL_ROLES,
+  getRoleLabel,
+  normalizeUserRole,
+  type CanonicalUserRole,
+} from '@/domain/types/user';
 
 const authStore = useAuthStore();
 const sucursalStore = useSucursalStore();
 const userStore = useUserStore();
 
-const roles: UserRole[] = ['admin', 'manager', 'cashier'];
+const roles: CanonicalUserRole[] = CANONICAL_ROLES;
 const selectedUserId = ref<string | null>(null);
 const resetPassword = ref('');
 
-  const createForm = reactive({
+const createForm = reactive({
   nombre: '',
   email: '',
   password: '',
-  rol: 'cashier' as UserRole,
+  rol: 'vendedor' as CanonicalUserRole,
   sucursalId: '' as string,
 });
 
 const editForm = reactive({
   nombre: '',
   email: '',
-  rol: 'cashier' as UserRole,
+  rol: 'vendedor' as CanonicalUserRole,
   sucursalId: '' as string,
   activo: true,
 });
@@ -47,12 +52,13 @@ onMounted(async () => {
 async function submitCreate() {
   await userStore.createUser({
     ...createForm,
+    rolesCodigos: [createForm.rol],
     sucursalId: createForm.sucursalId || null,
   });
   createForm.nombre = '';
   createForm.email = '';
   createForm.password = '';
-  createForm.rol = 'cashier';
+  createForm.rol = 'vendedor';
   createForm.sucursalId = '';
 }
 
@@ -66,10 +72,14 @@ function startEdit(id: string) {
 
   editForm.nombre = user.nombre;
   editForm.email = user.email;
-  editForm.rol = user.rol;
+  editForm.rol = normalizeUserRole(user.rol) ?? 'vendedor';
   editForm.sucursalId = user.sucursalId || '';
   editForm.activo = user.activo;
   resetPassword.value = '';
+}
+
+function roleLabel(role: string): string {
+  return getRoleLabel(role);
 }
 
 async function submitEdit() {
@@ -81,6 +91,7 @@ async function submitEdit() {
     nombre: editForm.nombre,
     email: editForm.email,
     rol: editForm.rol,
+    rolesCodigos: [editForm.rol],
     sucursalId: editForm.sucursalId || null,
     activo: editForm.activo,
   });
@@ -104,7 +115,7 @@ async function disableUser(id: string) {
   <div class="space-y-6">
     <header class="space-y-1">
       <h1 class="text-2xl font-semibold">Usuarios</h1>
-      <p class="text-sm text-text-secondary">CRUD basico de usuarios (solo administrador).</p>
+      <p class="text-sm text-text-secondary">Gestion de usuarios con roles nuevos y compatibilidad legacy temporal.</p>
     </header>
 
     <div class="grid gap-4 rounded-2xl border border-border bg-surface p-4 lg:grid-cols-2">
@@ -115,7 +126,7 @@ async function disableUser(id: string) {
           <input v-model="createForm.email" class="rounded-lg border border-border px-3 py-2 text-sm" placeholder="Email" type="email" required />
           <input v-model="createForm.password" class="rounded-lg border border-border px-3 py-2 text-sm" placeholder="Contrasena" type="password" minlength="6" required />
           <select v-model="createForm.rol" class="rounded-lg border border-border px-3 py-2 text-sm">
-            <option v-for="rol in roles" :key="rol" :value="rol">{{ rol }}</option>
+            <option v-for="rol in roles" :key="rol" :value="rol">{{ roleLabel(rol) }}</option>
           </select>
           <select v-model="createForm.sucursalId" class="rounded-lg border border-border px-3 py-2 text-sm">
             <option value="">Sin sucursal</option>
@@ -133,7 +144,7 @@ async function disableUser(id: string) {
           <input v-model="editForm.nombre" class="rounded-lg border border-border px-3 py-2 text-sm" required />
           <input v-model="editForm.email" class="rounded-lg border border-border px-3 py-2 text-sm" type="email" required />
           <select v-model="editForm.rol" class="rounded-lg border border-border px-3 py-2 text-sm">
-            <option v-for="rol in roles" :key="rol" :value="rol">{{ rol }}</option>
+            <option v-for="rol in roles" :key="rol" :value="rol">{{ roleLabel(rol) }}</option>
           </select>
           <select v-model="editForm.sucursalId" class="rounded-lg border border-border px-3 py-2 text-sm">
             <option value="">Sin sucursal</option>
@@ -179,7 +190,7 @@ async function disableUser(id: string) {
           <tr v-for="user in userStore.users" :key="user.id" class="hover:bg-bg/70">
             <td class="px-3 py-2">{{ user.nombre }}</td>
             <td class="px-3 py-2">{{ user.email }}</td>
-            <td class="px-3 py-2">{{ user.rol }}</td>
+            <td class="px-3 py-2">{{ roleLabel(user.rol) }}</td>
             <td class="px-3 py-2">{{ user.sucursalId ? sucursalNombreById.get(user.sucursalId) || user.sucursalId : '-' }}</td>
             <td class="px-3 py-2">
               <span class="rounded-full px-2 py-1 text-xs" :class="user.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">

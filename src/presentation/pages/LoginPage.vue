@@ -40,7 +40,7 @@ async function submitLogin() {
             <p class="text-xs uppercase tracking-[0.28em] text-cyan-200">MVP Fase 0</p>
             <h1 class="text-4xl font-semibold leading-tight">Control de acceso y usuarios para farmacia</h1>
             <p class="max-w-md text-sm text-slate-300">
-              Inicio de sesion con JWT simple, perfiles por rol y panel admin para gestionar usuarios.
+              Inicio de sesion con JWT simple, perfiles por rol (nuevos + legacy temporal) y panel de gestion.
             </p>
           </div>
           <p class="text-xs text-slate-300">Tip: usa credenciales iniciales para validar el flujo completo.</p>

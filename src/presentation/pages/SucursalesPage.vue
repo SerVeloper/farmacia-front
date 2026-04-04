@@ -79,7 +79,7 @@ async function disableSucursal(id: string) {
   <div class="space-y-6">
     <header class="space-y-1">
       <h1 class="text-2xl font-semibold">Sucursales</h1>
-      <p class="text-sm text-text-secondary">Gestion de sucursales (admin).</p>
+      <p class="text-sm text-text-secondary">Gestion de sucursales desde modulo Configuracion.</p>
     </header>
 
     <div class="grid gap-4 rounded-2xl border border-border bg-surface p-4 lg:grid-cols-2">
