@@ -68,6 +68,7 @@ export interface User {
   rol: UserRole;
   roles?: Array<{ codigo: CanonicalUserRole; nombre?: string }>;
   sucursalId: string | null;
+  sucursalActivaId?: string | null;
   activo: boolean;
   ultimoAcceso: string | null;
   fechaCreacion: string;

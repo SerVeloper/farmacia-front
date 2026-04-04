@@ -1,6 +1,7 @@
 import apiClient from '@/infrastructure/api/client';
 import type {
   ForgotPasswordDto,
+  LoginSucursalOption,
   LoginDto,
   LoginResponse,
   RefreshResponse,
@@ -26,6 +27,11 @@ export const authApi = {
       ...data,
       user: normalizeAuthUser(data.user),
     };
+  },
+
+  async getLoginBranches(): Promise<LoginSucursalOption[]> {
+    const { data } = await apiClient.get<LoginSucursalOption[]>('/auth/branches');
+    return data;
   },
 
   async me(): Promise<User> {

@@ -94,13 +94,13 @@ const router = createRouter({
     {
       path: '/ventas/ventas',
       name: 'ventas-ventas',
-      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      component: () => import('@/presentation/pages/VentasPage.vue'),
       meta: secureMeta({ modulo: 'ventas', accion: 'ver' }, 'Ventas'),
     },
     {
       path: '/ventas/nueva',
       name: 'ventas-nueva',
-      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      component: () => import('@/presentation/pages/VentasNuevaPage.vue'),
       meta: secureMeta({ modulo: 'ventas', accion: 'ver' }, 'Nueva venta'),
     },
     {
@@ -228,6 +228,17 @@ router.beforeEach(async (to) => {
 
   if (to.meta.publicOnly && authStore.isAuthenticated) {
     return { name: 'home' };
+  }
+
+  if (
+    authStore.isAuthenticated &&
+    !to.meta.publicOnly &&
+    (authStore.normalizedRole === 'administrador' ||
+      authStore.normalizedRole === 'contador') &&
+    !authStore.user?.sucursalActivaId
+  ) {
+    await authStore.logout(false);
+    return { name: 'login', query: { redirect: to.fullPath } };
   }
 
   const acl = to.meta.acl as AclPermission | undefined;
