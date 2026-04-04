@@ -104,15 +104,9 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
     modulo: 'caja',
     items: [
       {
-        nombre: 'Inicio de caja',
-        ruta: '/caja/inicio',
-        icono: Icons.plus,
-        permiso: { modulo: 'caja', accion: 'ver' },
-      },
-      {
-        nombre: 'Cierre de caja',
-        ruta: '/caja/cierre',
-        icono: Icons.check,
+        nombre: 'Caja',
+        ruta: '/caja',
+        icono: Icons.cash,
         permiso: { modulo: 'caja', accion: 'ver' },
       },
     ],
