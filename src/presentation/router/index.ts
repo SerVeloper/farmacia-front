@@ -94,13 +94,13 @@ const router = createRouter({
     {
       path: '/ventas/ventas',
       name: 'ventas-ventas',
-      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      component: () => import('@/presentation/pages/VentasPage.vue'),
       meta: secureMeta({ modulo: 'ventas', accion: 'ver' }, 'Ventas'),
     },
     {
       path: '/ventas/nueva',
       name: 'ventas-nueva',
-      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      component: () => import('@/presentation/pages/VentasNuevaPage.vue'),
       meta: secureMeta({ modulo: 'ventas', accion: 'ver' }, 'Nueva venta'),
     },
     {
