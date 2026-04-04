@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useAuthStore } from '@/application/stores/auth.store';
@@ -12,14 +12,22 @@ const form = reactive({
   email: '',
   password: '',
   rememberMe: false,
+  sucursalActivaId: '',
 });
 
 const submitting = ref(false);
 
+onMounted(async () => {
+  await authStore.fetchLoginBranches();
+});
+
 async function submitLogin() {
   submitting.value = true;
   try {
-    await authStore.login(form);
+    await authStore.login({
+      ...form,
+      sucursalActivaId: form.sucursalActivaId || undefined,
+    });
     const redirectTo = (route.query.redirect as string) || '/';
     await router.push(redirectTo);
   } finally {
@@ -74,6 +82,26 @@ async function submitLogin() {
                   required
                   class="w-full rounded-xl border border-white/15 bg-slate-900/60 px-4 py-3 text-sm outline-none ring-cyan-300 transition focus:ring"
                 />
+              </label>
+
+              <label class="block space-y-2">
+                <span class="text-sm text-slate-200">Sucursal activa</span>
+                <select
+                  v-model="form.sucursalActivaId"
+                  class="w-full rounded-xl border border-white/15 bg-slate-900/60 px-4 py-3 text-sm outline-none ring-cyan-300 transition focus:ring"
+                >
+                  <option value="">Selecciona una sucursal</option>
+                  <option
+                    v-for="branch in authStore.loginBranches"
+                    :key="branch.id"
+                    :value="branch.id"
+                  >
+                    {{ branch.nombre }} ({{ branch.codigo }})
+                  </option>
+                </select>
+                <p class="text-xs text-slate-400">
+                  Obligatorio para administrador y contador en cada login.
+                </p>
               </label>
 
               <label class="flex items-center gap-2 text-sm text-slate-300">

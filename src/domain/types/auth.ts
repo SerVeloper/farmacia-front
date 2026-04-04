@@ -4,6 +4,7 @@ export interface LoginDto {
   email: string;
   password: string;
   rememberMe?: boolean;
+  sucursalActivaId?: string;
 }
 
 export interface LoginResponse {
@@ -31,4 +32,10 @@ export interface ForgotPasswordDto {
 export interface ResetPasswordDto {
   token: string;
   newPassword: string;
+}
+
+export interface LoginSucursalOption {
+  id: string;
+  codigo: string;
+  nombre: string;
 }

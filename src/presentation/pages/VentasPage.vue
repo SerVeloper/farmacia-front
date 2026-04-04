@@ -11,13 +11,11 @@ const sucursalStore = useSucursalStore();
 const ventaStore = useVentaStore();
 
 const isPrivileged = computed(
-  () =>
-    authStore.normalizedRole === 'administrador' ||
-    authStore.normalizedRole === 'regente',
+  () => authStore.normalizedRole === 'administrador',
 );
 
 const filters = reactive({
-  sucursalId: authStore.user?.sucursalId || '',
+  sucursalId: authStore.user?.sucursalActivaId || authStore.user?.sucursalId || '',
   numeroVenta: '',
   desde: '',
   hasta: '',

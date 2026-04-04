@@ -11,12 +11,12 @@ const cajaStore = useCajaStore();
 const sucursalStore = useSucursalStore();
 
 const isPrivileged = computed(
-  () =>
-    authStore.normalizedRole === 'administrador' ||
-    authStore.normalizedRole === 'regente',
+  () => authStore.normalizedRole === 'administrador',
 );
 
-const selectedSucursalId = ref(authStore.user?.sucursalId || '');
+const selectedSucursalId = ref(
+  authStore.user?.sucursalActivaId || authStore.user?.sucursalId || '',
+);
 
 const openForm = reactive({
   montoApertura: 200,

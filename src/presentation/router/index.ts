@@ -230,6 +230,17 @@ router.beforeEach(async (to) => {
     return { name: 'home' };
   }
 
+  if (
+    authStore.isAuthenticated &&
+    !to.meta.publicOnly &&
+    (authStore.normalizedRole === 'administrador' ||
+      authStore.normalizedRole === 'contador') &&
+    !authStore.user?.sucursalActivaId
+  ) {
+    await authStore.logout(false);
+    return { name: 'login', query: { redirect: to.fullPath } };
+  }
+
   const acl = to.meta.acl as AclPermission | undefined;
 
   if (acl && !authStore.canAccess(acl.modulo, acl.accion)) {

@@ -6,6 +6,7 @@ import { setAuthClientHandlers } from '@/infrastructure/api/client';
 import { useToastStore } from '@/application/stores/toast.store';
 import type {
   ForgotPasswordDto,
+  LoginSucursalOption,
   LoginDto,
   ResetPasswordDto,
 } from '@/domain/types/auth';
@@ -20,6 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const token = ref<string | null>(null);
   const user = ref<User | null>(readStoredUser());
+  const loginBranches = ref<LoginSucursalOption[]>([]);
   const initialized = ref(false);
   const loading = ref(false);
 
@@ -60,6 +62,14 @@ export const useAuthStore = defineStore('auth', () => {
       throw error;
     } finally {
       loading.value = false;
+    }
+  }
+
+  async function fetchLoginBranches() {
+    try {
+      loginBranches.value = await authApi.getLoginBranches();
+    } catch {
+      loginBranches.value = [];
     }
   }
 
@@ -148,11 +158,13 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     user,
     loading,
+    loginBranches,
     isAuthenticated,
     normalizedRole,
     roleLabel,
     initialized,
     login,
+    fetchLoginBranches,
     initializeSession,
     refreshProfile,
     logout,

@@ -26,12 +26,12 @@ const sucursalStore = useSucursalStore();
 const ventaStore = useVentaStore();
 
 const isPrivileged = computed(
-  () =>
-    authStore.normalizedRole === 'administrador' ||
-    authStore.normalizedRole === 'regente',
+  () => authStore.normalizedRole === 'administrador',
 );
 
-const selectedSucursalId = ref(authStore.user?.sucursalId || '');
+const selectedSucursalId = ref(
+  authStore.user?.sucursalActivaId || authStore.user?.sucursalId || '',
+);
 const searchTerm = ref('');
 const cart = ref<CartItem[]>([]);
 const descuentoGlobal = ref(0);

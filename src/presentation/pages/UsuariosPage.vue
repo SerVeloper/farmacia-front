@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import { useAuthStore } from '@/application/stores/auth.store';
 import { useSucursalStore } from '@/application/stores/sucursal.store';
@@ -44,6 +44,27 @@ const sucursalNombreById = computed(() => {
     sucursalStore.sucursales.map((sucursal) => [sucursal.id, sucursal.nombre]),
   );
 });
+
+const roleRequiresSucursal = (role: CanonicalUserRole) =>
+  role === 'regente' || role === 'vendedor';
+
+watch(
+  () => createForm.rol,
+  (rol) => {
+    if (!roleRequiresSucursal(rol)) {
+      createForm.sucursalId = '';
+    }
+  },
+);
+
+watch(
+  () => editForm.rol,
+  (rol) => {
+    if (!roleRequiresSucursal(rol)) {
+      editForm.sucursalId = '';
+    }
+  },
+);
 
 onMounted(async () => {
   await Promise.all([userStore.fetchUsers(), sucursalStore.fetchSucursales()]);
@@ -128,8 +149,8 @@ async function disableUser(id: string) {
           <select v-model="createForm.rol" class="rounded-lg border border-border px-3 py-2 text-sm">
             <option v-for="rol in roles" :key="rol" :value="rol">{{ roleLabel(rol) }}</option>
           </select>
-          <select v-model="createForm.sucursalId" class="rounded-lg border border-border px-3 py-2 text-sm">
-            <option value="">Sin sucursal</option>
+          <select v-model="createForm.sucursalId" class="rounded-lg border border-border px-3 py-2 text-sm" :required="roleRequiresSucursal(createForm.rol)">
+            <option value="">{{ roleRequiresSucursal(createForm.rol) ? 'Selecciona sucursal' : 'Sin sucursal' }}</option>
             <option v-for="sucursal in sucursalStore.sucursales" :key="sucursal.id" :value="sucursal.id">
               {{ sucursal.nombre }}
             </option>
@@ -146,8 +167,8 @@ async function disableUser(id: string) {
           <select v-model="editForm.rol" class="rounded-lg border border-border px-3 py-2 text-sm">
             <option v-for="rol in roles" :key="rol" :value="rol">{{ roleLabel(rol) }}</option>
           </select>
-          <select v-model="editForm.sucursalId" class="rounded-lg border border-border px-3 py-2 text-sm">
-            <option value="">Sin sucursal</option>
+          <select v-model="editForm.sucursalId" class="rounded-lg border border-border px-3 py-2 text-sm" :required="roleRequiresSucursal(editForm.rol)">
+            <option value="">{{ roleRequiresSucursal(editForm.rol) ? 'Selecciona sucursal' : 'Sin sucursal' }}</option>
             <option v-for="sucursal in sucursalStore.sucursales" :key="sucursal.id" :value="sucursal.id">
               {{ sucursal.nombre }}
             </option>
