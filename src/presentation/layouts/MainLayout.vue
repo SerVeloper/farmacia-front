@@ -80,9 +80,9 @@ function toggleGroup(groupName: string) {
   openGroups[groupName] = !isGroupOpen(groupName);
 }
 
-function logout() {
-  authStore.logout();
-  router.push({ name: 'login' });
+async function logout() {
+  await authStore.logout();
+  await router.push({ name: 'login' });
 }
 </script>
 

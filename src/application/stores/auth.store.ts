@@ -94,13 +94,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(showToast = true) {
+    clearLocalSession();
+
     try {
       await authApi.logout();
     } catch {
       // noop
     }
-
-    clearLocalSession();
 
     if (showToast) {
       toast.info('Sesion cerrada');

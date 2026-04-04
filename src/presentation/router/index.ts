@@ -213,7 +213,9 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const authStore = useAuthStore();
 
-  await authStore.initializeSession();
+  if (!to.meta.publicOnly) {
+    await authStore.initializeSession();
+  }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return {
