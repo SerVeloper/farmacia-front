@@ -17,6 +17,16 @@ export const cajasApi = {
     return data;
   },
 
+  async pause(cajaId: string): Promise<Caja> {
+    const { data } = await apiClient.post<Caja>(`/cajas/${cajaId}/pause`, {});
+    return data;
+  },
+
+  async reopen(cajaId: string): Promise<Caja> {
+    const { data } = await apiClient.post<Caja>(`/cajas/${cajaId}/reopen`, {});
+    return data;
+  },
+
   async getCurrent(sucursalId: string): Promise<Caja[]> {
     const { data } = await apiClient.get<Caja[]>('/cajas/current', {
       params: { sucursalId },

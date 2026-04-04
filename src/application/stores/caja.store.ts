@@ -36,7 +36,17 @@ export const useCajaStore = defineStore('caja', () => {
     currentCajas.value.find((caja) => caja.usuarioAperturaId === authStore.user?.id),
   );
 
-  const hasOpenCaja = computed(() => Boolean(myCurrentCaja.value));
+  const hasOpenCaja = computed(
+    () => myCurrentCaja.value?.estado === 'abierta',
+  );
+
+  const hasPausedCaja = computed(
+    () => myCurrentCaja.value?.estado === 'pausada',
+  );
+
+  const hasOperativeCaja = computed(
+    () => hasOpenCaja.value || hasPausedCaja.value,
+  );
 
   async function refreshDashboard(sucursalId: string) {
     loadingCurrent.value = true;
@@ -91,6 +101,38 @@ export const useCajaStore = defineStore('caja', () => {
     }
   }
 
+  async function pauseCaja(cajaId: string, sucursalId: string) {
+    submittingAction.value = true;
+    try {
+      await cajasApi.pause(cajaId);
+      toast.info('Caja pausada temporalmente');
+      await refreshDashboard(sucursalId);
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message || 'No se pudo pausar la caja';
+      toast.error(Array.isArray(message) ? message[0] : message);
+      throw error;
+    } finally {
+      submittingAction.value = false;
+    }
+  }
+
+  async function reopenCaja(cajaId: string, sucursalId: string) {
+    submittingAction.value = true;
+    try {
+      await cajasApi.reopen(cajaId);
+      toast.success('Caja reaperturada correctamente');
+      await refreshDashboard(sucursalId);
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message || 'No se pudo reaperturar la caja';
+      toast.error(Array.isArray(message) ? message[0] : message);
+      throw error;
+    } finally {
+      submittingAction.value = false;
+    }
+  }
+
   return {
     currentCajas,
     salesSummary,
@@ -99,8 +141,12 @@ export const useCajaStore = defineStore('caja', () => {
     submittingAction,
     myCurrentCaja,
     hasOpenCaja,
+    hasPausedCaja,
+    hasOperativeCaja,
     refreshDashboard,
     openCaja,
     closeCaja,
+    pauseCaja,
+    reopenCaja,
   };
 });

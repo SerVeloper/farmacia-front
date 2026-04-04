@@ -29,15 +29,23 @@ const closeForm = reactive({
 
 const showCloseForm = ref(false);
 
-const cajaStatusLabel = computed(() =>
-  cajaStore.hasOpenCaja ? 'Caja Abierta' : 'Caja Cerrada',
-);
+const cajaStatusLabel = computed(() => {
+  if (cajaStore.hasOpenCaja) return 'Caja Abierta';
+  if (cajaStore.hasPausedCaja) return 'Caja Pausada';
+  return 'Caja Cerrada';
+});
 
-const cajaStatusClass = computed(() =>
-  cajaStore.hasOpenCaja
-    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-    : 'bg-slate-100 text-slate-700 border-slate-300',
-);
+const cajaStatusClass = computed(() => {
+  if (cajaStore.hasOpenCaja) {
+    return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+  }
+
+  if (cajaStore.hasPausedCaja) {
+    return 'bg-amber-100 text-amber-800 border-amber-300';
+  }
+
+  return 'bg-slate-100 text-slate-700 border-slate-300';
+});
 
 const currentCaja = computed(() => cajaStore.myCurrentCaja);
 
@@ -92,6 +100,18 @@ async function handleCloseCaja() {
   closeForm.observacion = '';
 }
 
+async function handlePauseCaja() {
+  if (!selectedSucursalId.value || !currentCaja.value) return;
+
+  await cajaStore.pauseCaja(currentCaja.value.id, selectedSucursalId.value);
+}
+
+async function handleReopenCaja() {
+  if (!selectedSucursalId.value || !currentCaja.value) return;
+
+  await cajaStore.reopenCaja(currentCaja.value.id, selectedSucursalId.value);
+}
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat('es-BO', {
     style: 'currency',
@@ -120,7 +140,16 @@ function formatDate(dateLike: string | null) {
           class="inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-semibold"
           :class="cajaStatusClass"
         >
-          <span class="mr-2 h-2.5 w-2.5 rounded-full" :class="cajaStore.hasOpenCaja ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'" />
+          <span
+            class="mr-2 h-2.5 w-2.5 rounded-full"
+            :class="
+              cajaStore.hasOpenCaja
+                ? 'bg-emerald-500 animate-pulse'
+                : cajaStore.hasPausedCaja
+                  ? 'bg-amber-500'
+                  : 'bg-slate-400'
+            "
+          />
           {{ cajaStatusLabel }}
         </span>
       </div>
@@ -161,7 +190,7 @@ function formatDate(dateLike: string | null) {
           </p>
         </div>
 
-        <div v-if="!cajaStore.hasOpenCaja" class="flex items-end gap-2">
+         <div v-if="!cajaStore.hasOperativeCaja" class="flex items-end gap-2">
           <label class="text-sm font-medium text-[var(--color-text-primary)]">
             Monto de apertura
             <input
@@ -182,6 +211,24 @@ function formatDate(dateLike: string | null) {
         </div>
 
         <div v-else class="flex gap-2">
+          <button
+            v-if="cajaStore.hasOpenCaja"
+            class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"
+            :disabled="cajaStore.submittingAction"
+            @click="handlePauseCaja"
+          >
+            Pausar caja
+          </button>
+
+          <button
+            v-if="cajaStore.hasPausedCaja"
+            class="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+            :disabled="cajaStore.submittingAction"
+            @click="handleReopenCaja"
+          >
+            Reaperturar caja
+          </button>
+
           <button
             class="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-bg)]"
             @click="showCloseForm = !showCloseForm"
@@ -245,7 +292,7 @@ function formatDate(dateLike: string | null) {
 
     <div class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
       <div class="border-b border-[var(--color-border)] px-4 py-3">
-        <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Resumen de ventas con caja abierta</h2>
+        <h2 class="text-sm font-semibold text-[var(--color-text-primary)]">Resumen de ventas del turno (abierta o pausada)</h2>
       </div>
 
       <div class="overflow-x-auto">

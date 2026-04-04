@@ -1,4 +1,4 @@
-export type CajaEstado = 'abierta' | 'cerrada';
+export type CajaEstado = 'abierta' | 'pausada' | 'cerrada';
 export type CajaMetodoPago = 'efectivo' | 'transferencia' | 'mixto';
 
 export interface Caja {
