@@ -21,13 +21,6 @@ export interface CompraCatalogoProducto {
   precioVenta: number;
   stockActual: number;
   /**
-   * R4: la clasificacion habilita lote+vencimiento obligatorios en la linea.
-   * Opcional en el tipo porque el catalogo vigente todavia no la expone; la UI
-   * solo exige lote/fecha cuando el servidor afirma `true` y NO infiere `false`
-   * a partir de la ausencia.
-   */
-  esMedicamento?: boolean;
-  /**
    * R9: alertas informativas de vencimiento del producto en la sucursal.
    * Opcionales: si el backend no las envia, la UI no inventa cortes ni umbrales.
    */
@@ -59,11 +52,6 @@ export interface QuickCreateProductoCompraDto {
   principioActivo: string;
   marcaId: string;
   categoriaId: string;
-  /**
-   * R1.3 / R4.5: requerido en quick-create. La UI lo expone como si/no sin
-   * seleccion inicial y no habilita el envio mientras no se elija.
-   */
-  esMedicamento: boolean;
 }
 
 export interface CreateCompraItemDto {

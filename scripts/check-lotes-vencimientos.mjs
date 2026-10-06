@@ -48,7 +48,6 @@ async function cargarModulo(clave) {
   return import(pathToFileURL(destino).href);
 }
 
-const { leerEsMedicamento } = await cargarModulo('producto');
 const {
   diasHastaVencimiento,
   diasVencidosAbsolutos,
@@ -80,27 +79,6 @@ function prueba(nombre, fn) {
     console.error(`FALLA ${nombre}\n      ${error.message}`);
   }
 }
-
-console.log('\nR1 — clasificacion explicita esMedicamento');
-
-prueba('lectura true preserva la decision humana', () => {
-  assert.equal(leerEsMedicamento({ esMedicamento: true }), true);
-});
-
-prueba('lectura false NO se convierte en null', () => {
-  assert.equal(leerEsMedicamento({ esMedicamento: false }), false);
-});
-
-prueba('campo ausente devuelve null (nunca false implicito)', () => {
-  assert.equal(leerEsMedicamento({}), null);
-});
-
-prueba('campo no booleano devuelve null', () => {
-  assert.equal(leerEsMedicamento({ esMedicamento: 'true' }), null);
-  assert.equal(leerEsMedicamento({ esMedicamento: 1 }), null);
-  assert.equal(leerEsMedicamento(null), null);
-  assert.equal(leerEsMedicamento(undefined), null);
-});
 
 console.log('\nR4.3 / R9 — fechas: vencido permitido, nunca bloqueante');
 

@@ -8,7 +8,6 @@ export interface VentaCatalogoProducto {
   principioActivo?: string | null;
   precioVenta: number;
   stockActual: number;
-  esMedicamento?: boolean;
   /**
    * R9: alertas informativas por producto en la sucursal activa.
    * Opcionales: sin este dato la UI no inventa umbrales ni fechas.

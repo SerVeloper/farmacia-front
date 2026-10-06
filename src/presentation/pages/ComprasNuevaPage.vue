@@ -20,8 +20,6 @@ interface QuickProductForm {
   principioActivo: string;
   marcaId: string;
   categoriaId: string;
-  /** R1.3: triestado; `null` = sin decidir, no se envia como false. */
-  esMedicamento: boolean | null;
 }
 
 interface CartItem {
@@ -31,7 +29,6 @@ interface CartItem {
     principioActivo: string;
     marcaId: string;
     categoriaId: string;
-    esMedicamento: boolean;
   };
   codigoProducto: string;
   nombreProducto: string;
@@ -44,10 +41,6 @@ interface CartItem {
   descuentoMonto: number;
   margen: number;
   precioVenta: number;
-  /** Clasificacion vigente del producto en la linea (R4). */
-  esMedicamento: boolean;
-  /** La clasificacion no vino del servidor: la UI no la inventa. */
-  esMedicamentoDesconocido: boolean;
 }
 
 const authStore = useAuthStore();
@@ -101,8 +94,6 @@ const modalItem = reactive<CartItem>({
   descuentoMonto: 0,
   margen: 20,
   precioVenta: 0,
-  esMedicamento: false,
-  esMedicamentoDesconocido: true,
 });
 
 const quickProductForm = reactive<QuickProductForm>({
@@ -110,7 +101,6 @@ const quickProductForm = reactive<QuickProductForm>({
   principioActivo: '',
   marcaId: '',
   categoriaId: '',
-  esMedicamento: null,
 });
 
 const quickProveedorForm = reactive({
@@ -189,15 +179,7 @@ const itemValidationErrors = computed(() => {
 
   // R4.1: medicamento exige numero de lote y fecha de vencimiento.
   // R4.3: una fecha pasada NO bloquea; solo se informa mas abajo.
-  if (modalItem.esMedicamento) {
-    if (!modalItem.lote.trim()) {
-      errors.push('El lote es obligatorio para medicamentos');
-    }
 
-    if (!modalItem.fechaVencimiento) {
-      errors.push('La fecha de vencimiento es obligatoria para medicamentos');
-    }
-  }
 
   return errors;
 });
@@ -305,8 +287,7 @@ function openProductModal(product: CompraCatalogoProducto) {
   // R4: la clasificacion viene del servidor. Si no la expone el catalogo
   // vigente, se marca como desconocida y la UI NO exige lote/fecha por su
   // cuenta: el backend sigue siendo la autoridad y respondera 400 si corresponde.
-  modalItem.esMedicamento = product.esMedicamento === true;
-  modalItem.esMedicamentoDesconocido = product.esMedicamento === undefined;
+
   resetModalItemBase();
   modalItem.costoCompraUnitario = Number(product.precioCompra || 0);
   setPreviousPrices(Number(product.precioCompra || 0), Number(product.precioVenta || 0));
@@ -336,8 +317,7 @@ function editCartItem(index: number) {
   modalItem.fechaVencimiento = item.fechaVencimiento;
   modalItem.margen = item.margen;
   modalItem.precioVenta = item.precioVenta;
-  modalItem.esMedicamento = item.esMedicamento;
-  modalItem.esMedicamentoDesconocido = item.esMedicamentoDesconocido;
+
   setPreviousPrices(item.costoCompraUnitario, item.precioVenta, item.margen);
   productModalOpen.value = true;
 }
@@ -412,19 +392,16 @@ function addItemFromModal() {
 }
 
 async function addQuickProductToCart() {
-  // R1.3 / R4.5: la clasificacion es obligatoria y explicita; sin decision no
-  // se habilita el quick-create.
+  // R1.3 / R4.5: los campos esenciales del quick-create son obligatorios;
+  // sin ellos no se habilita el alta.
   if (
     !quickProductForm.nombre ||
     !quickProductForm.principioActivo ||
     !quickProductForm.marcaId ||
-    !quickProductForm.categoriaId ||
-    quickProductForm.esMedicamento === null
+    !quickProductForm.categoriaId
   ) {
     return;
   }
-
-  const esMedicamento = quickProductForm.esMedicamento;
 
   editingCartIndex.value = null;
   modalItem.productoId = undefined;
@@ -433,12 +410,9 @@ async function addQuickProductToCart() {
     principioActivo: quickProductForm.principioActivo.trim(),
     marcaId: quickProductForm.marcaId,
     categoriaId: quickProductForm.categoriaId,
-    esMedicamento,
   };
   modalItem.codigoProducto = 'NUEVO';
   modalItem.nombreProducto = quickProductForm.nombre.trim();
-  modalItem.esMedicamento = esMedicamento;
-  modalItem.esMedicamentoDesconocido = false;
   resetModalItemBase();
   setPreviousPrices(0, 0, 0);
 
@@ -446,14 +420,9 @@ async function addQuickProductToCart() {
   quickProductForm.principioActivo = '';
   quickProductForm.marcaId = '';
   quickProductForm.categoriaId = '';
-  quickProductForm.esMedicamento = null;
   quickProductModalOpen.value = false;
   productSearchModalOpen.value = false;
   productModalOpen.value = true;
-}
-
-function seleccionarQuickProductoEsMedicamento(valor: boolean) {
-  quickProductForm.esMedicamento = valor;
 }
 
 const quickProductoCompleto = computed(
@@ -461,8 +430,7 @@ const quickProductoCompleto = computed(
     !!quickProductForm.nombre.trim() &&
     !!quickProductForm.principioActivo.trim() &&
     !!quickProductForm.marcaId &&
-    !!quickProductForm.categoriaId &&
-    quickProductForm.esMedicamento !== null,
+    !!quickProductForm.categoriaId,
 );
 
 async function createProveedorQuick() {
@@ -539,8 +507,8 @@ async function submitCompra() {
       unidadCompra: item.unidadCompra,
       factor: Number(item.factor),
       costoCompraUnitario: Number(item.costoCompraUnitario),
-      lote: item.esMedicamento ? item.lote.trim() : item.lote.trim() || undefined,
-      fechaVencimiento: item.esMedicamento ? item.fechaVencimiento : item.fechaVencimiento || undefined,
+      lote: item.lote.trim() || undefined,
+      fechaVencimiento: item.fechaVencimiento || undefined,
       descuentoMonto: lineDiscountApplied(item),
       margen: Number(item.margen),
       precioVenta: Number(item.precioVenta),
@@ -648,12 +616,7 @@ function money(value: number) {
             <div class="flex items-center justify-between">
               <p class="text-sm font-medium">
                 {{ item.nombreProducto }}
-                <span
-                  v-if="item.esMedicamento"
-                  class="ml-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                >
-                  Medicamento
-                </span>
+
               </p>
               <div class="flex gap-2">
                 <button class="text-xs text-[var(--color-primary)]" @click="editCartItem(index)">Editar</button>
@@ -844,16 +807,7 @@ function money(value: number) {
         <section class="space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
           <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">Datos operativos</h3>
           <p class="text-xs text-[var(--color-text-secondary)]">
-            <span v-if="modalItem.esMedicamento" class="font-medium text-[var(--color-text-primary)]">
-              Producto medicamento: lote y vencimiento son obligatorios.
-            </span>
-            <span v-else-if="modalItem.esMedicamentoDesconocido">
-              El servidor no informo la clasificacion del producto: lote y vencimiento son opcionales,
-              pero si es medicamento el backend los exige.
-            </span>
-            <span v-else>
-              Producto no medicamento: lote y vencimiento son opcionales.
-            </span>
+            Lote y vencimiento son opcionales según el producto.
           </p>
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div class="space-y-1.5">
@@ -892,26 +846,22 @@ function money(value: number) {
             <div class="space-y-1.5">
               <label class="block text-sm font-medium text-[var(--color-text-primary)]">
                 Lote
-                <span v-if="modalItem.esMedicamento" class="text-red-500">*</span>
-                <span v-else class="text-[var(--color-text-secondary)]">(opcional)</span>
+                <span class="text-[var(--color-text-secondary)]">(opcional)</span>
               </label>
               <input
                 v-model="modalItem.lote"
                 type="text"
-                :required="modalItem.esMedicamento"
                 class="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-2.5"
               />
             </div>
             <div class="space-y-1.5 md:col-span-2 lg:col-span-1">
               <label class="block text-sm font-medium text-[var(--color-text-primary)]">
                 Vencimiento
-                <span v-if="modalItem.esMedicamento" class="text-red-500">*</span>
-                <span v-else class="text-[var(--color-text-secondary)]">(opcional)</span>
+                <span class="text-[var(--color-text-secondary)]">(opcional)</span>
               </label>
               <input
                 v-model="modalItem.fechaVencimiento"
                 type="date"
-                :required="modalItem.esMedicamento"
                 class="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-2.5"
               />
             </div>
@@ -1054,44 +1004,7 @@ function money(value: number) {
             </select>
           </div>
         </div>
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-[var(--color-text-primary)]">
-            ¿Es medicamento? <span class="text-red-500">*</span>
-          </label>
-          <div class="flex flex-wrap items-center gap-4">
-            <label class="flex items-center gap-2">
-              <input
-                type="radio"
-                name="quickProductoEsMedicamento"
-                value="si"
-                :checked="quickProductForm.esMedicamento === true"
-                @change="seleccionarQuickProductoEsMedicamento(true)"
-              />
-              <span class="text-sm text-[var(--color-text-primary)]">Sí</span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input
-                type="radio"
-                name="quickProductoEsMedicamento"
-                value="no"
-                :checked="quickProductForm.esMedicamento === false"
-                @change="seleccionarQuickProductoEsMedicamento(false)"
-              />
-              <span class="text-sm text-[var(--color-text-primary)]">No</span>
-            </label>
-          </div>
-          <p class="text-xs text-[var(--color-text-secondary)]">
-            Si eliges Sí, el lote y la fecha de vencimiento serán obligatorios en el item de compra.
-          </p>
-          <!-- R1.3: el alta rapida NO admite ausencia como false implicito. -->
-          <p
-            v-if="quickProductForm.esMedicamento === null"
-            class="text-xs text-amber-600 dark:text-amber-400"
-          >
-            Sin selección: elegí Sí o No para crear el producto. No se puede enviar la compra sin
-            esa decisión.
-          </p>
-        </div>
+
       </form>
       <template #footer>
         <div class="flex justify-end gap-3">
