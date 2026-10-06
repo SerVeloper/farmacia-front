@@ -1,0 +1,43 @@
+{
+  "timezone": "America/La_Paz",
+  "campaigns": [
+    {
+      "id": "carnaval",
+      "name": "Carnaval",
+      "startDate": "02-01",
+      "endDate": "02-29",
+      "image": "/campaigns/campana-carnaval.jpg",
+      "description": "Promociones de temporada para la campaña de Carnaval."
+    },
+    {
+      "id": "dia-de-la-madre",
+      "name": "Día de la Madre",
+      "startDate": "05-10",
+      "endDate": "05-31",
+      "image": "/campaigns/campana-dia-madre.jpg",
+      "description": "Campaña especial por el Día de la Madre."
+    },
+    {
+      "id": "fiestas-patrias",
+      "name": "Fiestas Patrias",
+      "startDate": "08-01",
+      "endDate": "08-31",
+      "image": "/campaigns/campana-fiestas-patrias.jpg",
+      "description": "Beneficios y promociones durante Fiestas Patrias."
+    },
+    {
+      "id": "navidad",
+      "name": "Navidad",
+      "startDate": "12-01",
+      "endDate": "12-31",
+      "image": "/campaigns/campana-navidad.jpg",
+      "description": "Campaña navideña para cierre de año."
+    }
+  ],
+  "fallback": {
+    "id": "institucional",
+    "name": "Campaña Institucional",
+    "image": "/campaigns/campana-institucional.jpg",
+    "description": "Plataforma empresarial de gestión farmacéutica."
+  }
+}

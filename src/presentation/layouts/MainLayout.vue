@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 
 import { useAuthStore } from '@/application/stores/auth.store';
@@ -36,6 +36,20 @@ const visibleGroups = computed(() =>
 const userName = computed(() => authStore.user?.nombre ?? 'Sin sesión');
 const userRole = computed(() => authStore.roleLabel);
 const userInitials = computed(() => getInitials(userName.value));
+const shouldShowBranchSelector = computed(() =>
+  ['administrador', 'contador', 'regente', 'vendedor'].includes(
+    authStore.normalizedRole ?? '',
+  ),
+);
+const canSwitchBranch = computed(() =>
+  ['administrador', 'contador'].includes(authStore.normalizedRole ?? ''),
+);
+const selectedBranchId = computed({
+  get: () => authStore.user?.sucursalActivaId ?? '',
+  set: (value: string) => {
+    void handleBranchChange(value);
+  },
+});
 
 function isActive(path: string): boolean {
   return route.path === path;
@@ -84,6 +98,33 @@ async function logout() {
   await authStore.logout();
   await router.push({ name: 'login' });
 }
+
+async function loadAvailableBranches() {
+  if (!authStore.isAuthenticated) {
+    return;
+  }
+
+  await authStore.fetchAvailableBranches();
+}
+
+async function handleBranchChange(branchId: string) {
+  if (!canSwitchBranch.value || !branchId) {
+    return;
+  }
+
+  await authStore.changeActiveBranch(branchId);
+}
+
+onMounted(() => {
+  void loadAvailableBranches();
+});
+
+watch(
+  () => authStore.user?.id,
+  () => {
+    void loadAvailableBranches();
+  },
+);
 </script>
 
 <template>
@@ -116,7 +157,7 @@ async function logout() {
       </div>
 
       <!-- Header usuario -->
-      <div class="px-4 py-4 border-b border-border shrink-0">
+      <div class="px-4 py-3 border-b border-border shrink-0">
         <div
           :class="[
             'flex items-center',
@@ -293,6 +334,35 @@ async function logout() {
 
     <!-- Main -->
     <div class="flex-1 flex flex-col min-h-screen">
+      <header
+        v-if="shouldShowBranchSelector"
+        class="border-b border-border bg-surface px-4 py-3.5 md:px-6"
+      >
+        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-wide text-text-secondary">Sucursal de trabajo</p>
+            <p class="text-sm text-text-secondary">
+              {{ canSwitchBranch ? 'Selecciona la sucursal para operar' : 'Sucursal asignada al usuario' }}
+            </p>
+          </div>
+
+          <select
+            v-model="selectedBranchId"
+            class="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text md:max-w-sm"
+            :disabled="!canSwitchBranch || authStore.changingBranch || authStore.availableBranches.length <= 1"
+          >
+            <option value="" disabled>Selecciona una sucursal</option>
+            <option
+              v-for="branch in authStore.availableBranches"
+              :key="branch.id"
+              :value="branch.id"
+            >
+              {{ branch.nombre }} ({{ branch.codigo }})
+            </option>
+          </select>
+        </div>
+      </header>
+
       <main class="flex-1 p-4 md:p-6 bg-bg">
         <RouterView />
       </main>

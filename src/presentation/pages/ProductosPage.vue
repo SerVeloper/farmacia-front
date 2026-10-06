@@ -3,7 +3,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useProductoStore } from '@/application/stores/producto.store';
 import { useCategoriaStore } from '@/application/stores/categoria.store';
 import { useMarcaStore } from '@/application/stores/marca.store';
-import type { Producto, CreateProductoDto, UpdateProductoDto } from '@/domain/types/producto';
+import { useUnidadMedidaStore } from '@/application/stores/unidad-medida.store';
+import { leerEsMedicamento, type Producto, type CreateProductoDto, type UpdateProductoDto } from '@/domain/types/producto';
 import Modal from '@/presentation/components/common/Modal.vue';
 import ConfirmDialog from '@/presentation/components/common/ConfirmDialog.vue';
 import Spinner from '@/presentation/components/common/Spinner.vue';
@@ -13,6 +14,7 @@ import { Icons } from '@/presentation/config/icons';
 const productoStore = useProductoStore();
 const categoriaStore = useCategoriaStore();
 const marcaStore = useMarcaStore();
+const unidadMedidaStore = useUnidadMedidaStore();
 
 const modalOpen = ref(false);
 const confirmOpen = ref(false);
@@ -34,20 +36,35 @@ const quickForm = ref({
 const searchQuery = ref('');
 let searchTimeout: ReturnType<typeof setTimeout>;
 
-const form = ref<CreateProductoDto>({
-  nombre: '',
-  categoriaId: undefined,
-  marcaId: undefined,
-  principioActivo: '',
-  unidad: 'pieza',
-  precioCompra: 0,
-  precioVenta: 0,
-  margen: 20,
-  stockMinimo: 0,
-  stockMaximo: 0,
-  esControlado: false,
-  descripcion: ''
-});
+/**
+ * R1: el formulario trabaja con un triestado (`null` = sin decidir) porque
+ * `CreateProductoDto.esMedicamento` es booleano REQUERIDO. El `null` vive solo
+ * en la vista; nunca sale en el payload.
+ */
+type ProductoFormModel = Omit<CreateProductoDto, 'esMedicamento'> & {
+  esMedicamento: boolean | null;
+};
+
+function crearFormularioVacio(): ProductoFormModel {
+  return {
+    nombre: '',
+    categoriaId: undefined,
+    marcaId: undefined,
+    principioActivo: '',
+    unidad: 'pieza',
+    precioCompra: 0,
+    precioVenta: 0,
+    margen: 20,
+    stockMinimo: 0,
+    stockMaximo: 0,
+    esControlado: false,
+    esMedicamento: null,
+    descripcion: ''
+  };
+}
+
+const form = ref<ProductoFormModel>(crearFormularioVacio());
+const errorClasificacion = ref('');
 
 const productoIdEditando = ref<string | null>(null);
 
@@ -70,7 +87,8 @@ async function loadSelects() {
   loadingSelects.value = true;
   await Promise.all([
     categoriaStore.fetchCategorias(),
-    marcaStore.fetchMarcas()
+    marcaStore.fetchMarcas(),
+    unidadMedidaStore.fetchUnidades(),
   ]);
   loadingSelects.value = false;
 }
@@ -78,20 +96,9 @@ async function loadSelects() {
 function abrirModalCrear() {
   esEdicion.value = false;
   productoIdEditando.value = null;
-  form.value = {
-    nombre: '',
-    categoriaId: undefined,
-    marcaId: undefined,
-    principioActivo: '',
-    unidad: 'pieza',
-    precioCompra: 0,
-    precioVenta: 0,
-    margen: 20,
-    stockMinimo: 0,
-    stockMaximo: 0,
-    esControlado: false,
-    descripcion: ''
-  };
+  errorClasificacion.value = '';
+  // R1.1: alta siempre arranca sin seleccion.
+  form.value = crearFormularioVacio();
   loadSelects();
   modalOpen.value = true;
 }
@@ -99,6 +106,11 @@ function abrirModalCrear() {
 function abrirModalEditar(producto: Producto) {
   esEdicion.value = true;
   productoIdEditando.value = producto.id;
+  errorClasificacion.value = '';
+  // R1.5: se carga el valor vigente y NO se resetea. Si la API omite el campo,
+  // `leerEsMedicamento` devuelve `null` (clasificacion DESCONOCIDA): la UI no
+  // inventa un `false` por defecto, deja el control sin marcar y omite el campo
+  // del payload para que el backend preserve lo almacenado (R1.5).
   form.value = {
     nombre: producto.nombre,
     categoriaId: producto.categoriaId || undefined,
@@ -111,22 +123,51 @@ function abrirModalEditar(producto: Producto) {
     stockMinimo: producto.stockMinimo,
     stockMaximo: producto.stockMaximo,
     esControlado: producto.esControlado,
+    esMedicamento: leerEsMedicamento(producto),
     descripcion: producto.descripcion || ''
   };
   loadSelects();
   modalOpen.value = true;
 }
 
+function seleccionarEsMedicamento(valor: boolean) {
+  form.value.esMedicamento = valor;
+  errorClasificacion.value = '';
+}
+
 async function handleSubmit() {
+  // R1.1: en ALTA no se envia sin decision explicita.
+  // R1.5: en EDICION una clasificacion desconocida NO bloquea otros cambios:
+  // se omite el campo y el backend preserva el valor almacenado.
+  if (form.value.esMedicamento === null && !esEdicion.value) {
+    errorClasificacion.value = 'Debes indicar si el producto es medicamento (Sí/No).';
+    return;
+  }
+
+  errorClasificacion.value = '';
   loadingSubmit.value = true;
   try {
-    if (esEdicion.value && productoIdEditando.value) {
-      await productoStore.actualizarProducto(productoIdEditando.value, form.value as UpdateProductoDto);
+    const { esMedicamento, ...resto } = form.value;
+
+    if (esMedicamento === null) {
+      // Clasificacion desconocida en edicion: no se envia el campo (R1.5).
+      await productoStore.actualizarProducto(productoIdEditando.value as string, { ...resto } as UpdateProductoDto);
     } else {
-      await productoStore.crearProducto(form.value);
+      const payload = { ...resto, esMedicamento } as CreateProductoDto;
+
+      if (esEdicion.value && productoIdEditando.value) {
+        await productoStore.actualizarProducto(productoIdEditando.value, payload as UpdateProductoDto);
+      } else {
+        await productoStore.crearProducto(payload);
+      }
     }
+
     modalOpen.value = false;
     await productoStore.fetchProductos();
+  } catch {
+    // El store ya emite toast.error y relanza el error. Aquí SOLO se contiene
+    // la promesa rechazada para evitar unhandled rejection en el event handler
+    // de Vue. El modal permanece abierto con los valores intactos.
   } finally {
     loadingSubmit.value = false;
   }
@@ -139,9 +180,14 @@ function confirmarEliminar(id: string) {
 
 async function handleEliminar() {
   if (productoAEliminar.value) {
-    await productoStore.eliminarProducto(productoAEliminar.value);
-    confirmOpen.value = false;
-    productoAEliminar.value = null;
+    try {
+      await productoStore.eliminarProducto(productoAEliminar.value);
+      confirmOpen.value = false;
+      productoAEliminar.value = null;
+    } catch {
+      // El store ya emite toast.error y relanza. El diálogo permanece abierto.
+      // Solo se contiene la rechazada para evitar unhandled rejection.
+    }
   }
 }
 
@@ -249,6 +295,23 @@ async function handleCrearMarca() {
                 <TableSkeleton :columns="8" :rows="5" />
               </td>
             </tr>
+            <tr v-else-if="productoStore.error" class="text-center">
+              <td colspan="8" class="px-4 py-12">
+                <div class="flex flex-col items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <p class="text-sm font-medium text-red-600 dark:text-red-400">{{ productoStore.error }}</p>
+                  <p class="text-xs text-[var(--color-text-secondary)]">No se pudieron cargar los productos. Verificá la conexión con el servidor e intentá nuevamente.</p>
+                  <button
+                    @click="productoStore.fetchProductos(pagination.page)"
+                    class="px-4 py-2 text-sm rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors font-medium"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              </td>
+            </tr>
             <tr v-else-if="productoStore.productos.length === 0" class="text-center">
               <td colspan="8" class="px-4 py-12">
                 <div class="flex flex-col items-center gap-3">
@@ -269,7 +332,23 @@ async function handleCrearMarca() {
               </td>
               <td class="px-4 py-3">
                 <div>
-                  <p class="font-medium text-[var(--color-text-primary)]">{{ producto.nombre }}</p>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <p class="font-medium text-[var(--color-text-primary)]">{{ producto.nombre }}</p>
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                      :class="leerEsMedicamento(producto) === true
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                        : leerEsMedicamento(producto) === false
+                          ? 'bg-[var(--color-bg)] text-[var(--color-text-secondary)]'
+                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'"
+                    >
+                      {{ leerEsMedicamento(producto) === true
+                        ? 'Medicamento'
+                        : leerEsMedicamento(producto) === false
+                          ? 'No medicamento'
+                          : 'Sin clasificar' }}
+                    </span>
+                  </div>
                   <p v-if="producto.principioActivo" class="text-xs text-[var(--color-text-secondary)] mt-0.5">{{ producto.principioActivo }}</p>
                 </div>
               </td>
@@ -329,12 +408,12 @@ async function handleCrearMarca() {
         </table>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="pagination.totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)] bg-[var(--color-bg)]">
+      <!-- Pagination: el resumen SIEMPRE es visible; los botones solo cuando hay más de una página -->
+      <div class="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)] bg-[var(--color-bg)]">
         <p class="text-sm text-[var(--color-text-secondary)]">
           Mostrando {{ (pagination.page - 1) * pagination.limit + 1 }} - {{ Math.min(pagination.page * pagination.limit, pagination.total) }} de {{ pagination.total }}
         </p>
-        <div class="flex gap-1">
+        <div v-if="pagination.totalPages > 1" class="flex gap-1">
           <button
             @click="cambioPagina(pagination.page - 1)"
             :disabled="pagination.page <= 1"
@@ -516,20 +595,61 @@ async function handleCrearMarca() {
                 v-model="form.unidad"
                 class="w-full px-3.5 py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all appearance-none"
               >
-                <option value="pieza">Pieza</option>
-                <option value="tableta">Tableta</option>
-                <option value="capsula">Cápsula</option>
-                <option value="ml">Mililitro (ml)</option>
-                <option value="g">Gramo (g)</option>
-                <option value="sobre">Sobre</option>
-                <option value="frasco">Frasco</option>
-                <option value="caja">Caja</option>
+                <option
+                  v-for="unidad in unidadMedidaStore.unidades"
+                  :key="unidad.id"
+                  :value="unidad.abreviatura"
+                >
+                  {{ unidad.nombre }} ({{ unidad.abreviatura }})
+                </option>
               </select>
               <svg xmlns="http://www.w3.org/2000/svg" class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-secondary)] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </div>
           </div>
+        </div>
+
+        <!-- Clasificación esMedicamento (R1) -->
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-[var(--color-text-primary)]">
+            ¿Es medicamento? <span class="text-red-500">*</span>
+          </label>
+          <div class="flex flex-wrap items-center gap-4">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="esMedicamento"
+                value="si"
+                :checked="form.esMedicamento === true"
+                @change="seleccionarEsMedicamento(true)"
+                class="w-4 h-4 border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] focus:ring-offset-0"
+              />
+              <span class="text-sm text-[var(--color-text-primary)]">Sí</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="esMedicamento"
+                value="no"
+                :checked="form.esMedicamento === false"
+                @change="seleccionarEsMedicamento(false)"
+                class="w-4 h-4 border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)] focus:ring-offset-0"
+              />
+              <span class="text-sm text-[var(--color-text-primary)]">No</span>
+            </label>
+            <p class="text-xs text-[var(--color-text-secondary)]">
+              Si es medicamento, la compra exige lote y vencimiento y la venta descuenta por FEFO automáticamente.
+            </p>
+          </div>
+          <p v-if="errorClasificacion" class="text-xs text-red-500">{{ errorClasificacion }}</p>
+          <p
+            v-else-if="esEdicion && form.esMedicamento === null"
+            class="text-xs text-amber-600 dark:text-amber-400"
+          >
+            El backend no informó la clasificación de este producto. Se conservará la almacenada
+            al guardar; elegí Sí/No solo si querés reclasificarlo ahora.
+          </p>
         </div>
 
         <!-- Checkbox y Descripción -->
@@ -568,7 +688,7 @@ async function handleCrearMarca() {
           </button>
           <button
             @click="handleSubmit"
-            :disabled="loadingSubmit"
+            :disabled="loadingSubmit || (!esEdicion && form.esMedicamento === null)"
             class="px-5 py-2 rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium shadow-sm hover:shadow-md"
           >
             <Spinner v-if="loadingSubmit" size="sm" />

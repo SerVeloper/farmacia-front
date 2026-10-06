@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Imagenes de campanas del login (se mantienen locales, no en el repo)
+/public/campaigns/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

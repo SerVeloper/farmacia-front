@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useCategoriaStore } from '@/application/stores/categoria.store';
 import type { Categoria, CreateCategoriaDto, UpdateCategoriaDto } from '@/domain/types/categoria';
 import Modal from '@/presentation/components/common/Modal.vue';
@@ -25,8 +25,15 @@ const form = ref<CreateCategoriaDto>({
 
 const categoriaIdEditando = ref<string | null>(null);
 
+// Límite de página de este listado admin (patrón ProductosPage).
+const PAGE_SIZE = 10;
+
+// Mismo patrón que ProductosPage: expone la paginación del store a la plantilla.
+const pagination = computed(() => categoriaStore.pagination);
+
 onMounted(() => {
-  categoriaStore.fetchCategorias();
+  // Página admin: SIEMPRE con args para que el listado quede paginado.
+  categoriaStore.fetchCategorias(1, PAGE_SIZE);
 });
 
 watch(searchQuery, (newQuery) => {
@@ -38,7 +45,7 @@ watch(searchQuery, (newQuery) => {
         (c.descripcion && c.descripcion.toLowerCase().includes(newQuery.toLowerCase()))
       );
     } else {
-      categoriaStore.fetchCategorias();
+      categoriaStore.fetchCategorias(1, PAGE_SIZE);
     }
   }, 300);
 });
@@ -69,7 +76,12 @@ async function handleSubmit() {
       await categoriaStore.crearCategoria(form.value);
     }
     modalOpen.value = false;
-    await categoriaStore.fetchCategorias();
+    // Refresca la página visible para que total/resumen queden exactos.
+    await categoriaStore.fetchCategorias(pagination.value.page, pagination.value.limit);
+  } catch {
+    // El store ya emite toast.error y relanza el error. Aquí SOLO se contiene
+    // la promesa rechazada para evitar unhandled rejection en el event handler
+    // de Vue. El modal permanece abierto con los valores intactos.
   } finally {
     loadingSubmit.value = false;
   }
@@ -82,10 +94,21 @@ function confirmarEliminar(id: string) {
 
 async function handleEliminar() {
   if (categoriaAEliminar.value) {
-    await categoriaStore.eliminarCategoria(categoriaAEliminar.value);
-    confirmOpen.value = false;
-    categoriaAEliminar.value = null;
+    try {
+      await categoriaStore.eliminarCategoria(categoriaAEliminar.value);
+      confirmOpen.value = false;
+      categoriaAEliminar.value = null;
+      // Refresca la página visible para que total/resumen queden exactos.
+      await categoriaStore.fetchCategorias(pagination.value.page, pagination.value.limit);
+    } catch {
+      // El store ya emite toast.error y relanza. El diálogo permanece abierto.
+      // Solo se contiene la rechazada para evitar unhandled rejection.
+    }
   }
+}
+
+function cambioPagina(nuevaPagina: number) {
+  categoriaStore.fetchCategorias(nuevaPagina, pagination.value.limit);
 }
 </script>
 
@@ -137,6 +160,23 @@ async function handleEliminar() {
             <tr v-if="categoriaStore.loading" class="text-center">
               <td colspan="4" class="px-4 py-8">
                 <TableSkeleton :columns="4" :rows="5" />
+              </td>
+            </tr>
+            <tr v-else-if="categoriaStore.error" class="text-center">
+              <td colspan="4" class="px-4 py-12">
+                <div class="flex flex-col items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <p class="text-sm font-medium text-red-600 dark:text-red-400">{{ categoriaStore.error }}</p>
+                  <p class="text-xs text-[var(--color-text-secondary)]">No se pudieron cargar las categorías. Verificá la conexión con el servidor e intentá nuevamente.</p>
+                  <button
+                    @click="categoriaStore.fetchCategorias(pagination.page, pagination.limit)"
+                    class="px-4 py-2 text-sm rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors font-medium"
+                  >
+                    Reintentar
+                  </button>
+                </div>
               </td>
             </tr>
             <tr v-else-if="categoriaStore.categorias.length === 0" class="text-center">
@@ -193,6 +233,29 @@ async function handleEliminar() {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination: el resumen SIEMPRE es visible; los botones solo cuando hay más de una página -->
+      <div class="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)] bg-[var(--color-bg)]">
+        <p class="text-sm text-[var(--color-text-secondary)]">
+          Mostrando {{ (pagination.page - 1) * pagination.limit + 1 }} - {{ Math.min(pagination.page * pagination.limit, pagination.total) }} de {{ pagination.total }}
+        </p>
+        <div v-if="pagination.totalPages > 1" class="flex gap-1">
+          <button
+            @click="cambioPagina(pagination.page - 1)"
+            :disabled="pagination.page <= 1"
+            class="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-bg)] transition-colors"
+          >
+            Anterior
+          </button>
+          <button
+            @click="cambioPagina(pagination.page + 1)"
+            :disabled="pagination.page >= pagination.totalPages"
+            class="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-bg)] transition-colors"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
     </div>
 

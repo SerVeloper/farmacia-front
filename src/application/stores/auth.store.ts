@@ -22,8 +22,10 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null);
   const user = ref<User | null>(readStoredUser());
   const loginBranches = ref<LoginSucursalOption[]>([]);
+  const availableBranches = ref<LoginSucursalOption[]>([]);
   const initialized = ref(false);
   const loading = ref(false);
+  const changingBranch = ref(false);
 
   const isAuthenticated = computed(() => Boolean(token.value && user.value));
   const normalizedRole = computed(() => normalizeUserRole(user.value?.rol));
@@ -35,6 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         const response = await authApi.refresh();
         token.value = response.accessToken;
+        syncSucursalActiva(response.sucursalActivaId);
         return token.value;
       } catch {
         clearLocalSession();
@@ -55,6 +58,7 @@ export const useAuthStore = defineStore('auth', () => {
       initialized.value = true;
 
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(response.user));
+      await fetchAvailableBranches();
       toast.success(`Bienvenido, ${response.user.nombre}`);
     } catch (error: any) {
       const message = error.response?.data?.message || 'No se pudo iniciar sesion';
@@ -70,6 +74,19 @@ export const useAuthStore = defineStore('auth', () => {
       loginBranches.value = await authApi.getLoginBranches();
     } catch {
       loginBranches.value = [];
+    }
+  }
+
+  async function fetchAvailableBranches() {
+    if (!token.value) {
+      availableBranches.value = [];
+      return;
+    }
+
+    try {
+      availableBranches.value = await authApi.getAvailableBranches();
+    } catch {
+      availableBranches.value = [];
     }
   }
 
@@ -97,9 +114,35 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const refreshResponse = await authApi.refresh();
       token.value = refreshResponse.accessToken;
+      syncSucursalActiva(refreshResponse.sucursalActivaId);
       await refreshProfile();
+      await fetchAvailableBranches();
     } catch {
       clearLocalSession();
+    }
+  }
+
+  async function changeActiveBranch(sucursalActivaId: string) {
+    if (!token.value || !user.value?.id) {
+      return;
+    }
+
+    if (user.value.sucursalActivaId === sucursalActivaId) {
+      return;
+    }
+
+    changingBranch.value = true;
+    try {
+      const response = await authApi.refresh({ sucursalActivaId });
+      token.value = response.accessToken;
+      syncSucursalActiva(response.sucursalActivaId ?? sucursalActivaId);
+      toast.success('Sucursal activa actualizada');
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'No se pudo cambiar la sucursal activa';
+      toast.error(Array.isArray(message) ? message[0] : message);
+      throw error;
+    } finally {
+      changingBranch.value = false;
     }
   }
 
@@ -132,7 +175,20 @@ export const useAuthStore = defineStore('auth', () => {
   function clearLocalSession() {
     token.value = null;
     user.value = null;
+    availableBranches.value = [];
     localStorage.removeItem(AUTH_USER_KEY);
+  }
+
+  function syncSucursalActiva(sucursalActivaId?: string | null) {
+    if (!user.value || sucursalActivaId === undefined) {
+      return;
+    }
+
+    user.value = {
+      ...user.value,
+      sucursalActivaId,
+    };
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user.value));
   }
 
   function hasRole(roles: UserRole[]) {
@@ -159,14 +215,18 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     loading,
     loginBranches,
+    availableBranches,
+    changingBranch,
     isAuthenticated,
     normalizedRole,
     roleLabel,
     initialized,
     login,
     fetchLoginBranches,
+    fetchAvailableBranches,
     initializeSession,
     refreshProfile,
+    changeActiveBranch,
     logout,
     forgotPassword,
     resetPassword,

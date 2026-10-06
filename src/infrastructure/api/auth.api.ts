@@ -4,6 +4,7 @@ import type {
   LoginSucursalOption,
   LoginDto,
   LoginResponse,
+  RefreshDto,
   RefreshResponse,
   ResetPasswordDto,
 } from '@/domain/types/auth';
@@ -34,13 +35,18 @@ export const authApi = {
     return data;
   },
 
+  async getAvailableBranches(): Promise<LoginSucursalOption[]> {
+    const { data } = await apiClient.get<LoginSucursalOption[]>('/auth/available-branches');
+    return data;
+  },
+
   async me(): Promise<User> {
     const { data } = await apiClient.get<User>('/auth/me');
     return normalizeAuthUser(data);
   },
 
-  async refresh(): Promise<RefreshResponse> {
-    const { data } = await apiClient.post<RefreshResponse>('/auth/refresh', {});
+  async refresh(dto: RefreshDto = {}): Promise<RefreshResponse> {
+    const { data } = await apiClient.post<RefreshResponse>('/auth/refresh', dto);
     return data;
   },
 

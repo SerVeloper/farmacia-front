@@ -46,6 +46,12 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
         icono: Icons.categoria,
         permiso: { modulo: 'inventario', accion: 'ver' },
       },
+      {
+        nombre: 'Unidades',
+        ruta: '/inventario/unidades',
+        icono: Icons.clipboard,
+        permiso: { modulo: 'inventario', accion: 'ver' },
+      },
     ],
   },
   {

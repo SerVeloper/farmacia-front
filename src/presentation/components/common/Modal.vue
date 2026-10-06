@@ -4,7 +4,7 @@ import { watch } from 'vue';
 const props = defineProps<{
   open: boolean;
   title?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
 }>();
 
 const emit = defineEmits<{
@@ -15,7 +15,9 @@ const sizeClasses = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-lg',
-  xl: 'max-w-xl'
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
 };
 
 watch(() => props.open, (isOpen) => {

@@ -74,15 +74,21 @@ const router = createRouter({
       meta: secureMeta({ modulo: 'inventario', accion: 'ver' }),
     },
     {
+      path: '/inventario/unidades',
+      name: 'inventario-unidades',
+      component: () => import('@/presentation/pages/UnidadesMedidaPage.vue'),
+      meta: secureMeta({ modulo: 'inventario', accion: 'ver' }),
+    },
+    {
       path: '/compras/compras',
       name: 'compras-compras',
-      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      component: () => import('@/presentation/pages/ComprasPage.vue'),
       meta: secureMeta({ modulo: 'compras', accion: 'ver' }, 'Compras'),
     },
     {
       path: '/compras/nueva',
       name: 'compras-nueva',
-      component: () => import('@/presentation/pages/PlaceholderPage.vue'),
+      component: () => import('@/presentation/pages/ComprasNuevaPage.vue'),
       meta: secureMeta({ modulo: 'compras', accion: 'ver' }, 'Nueva compra'),
     },
     {

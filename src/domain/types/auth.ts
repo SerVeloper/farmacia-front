@@ -20,6 +20,12 @@ export interface RefreshResponse {
   tokenType: string;
   expiresIn: string;
   sessionExpiresIn: string;
+  sucursalActivaId?: string | null;
+}
+
+export interface RefreshDto {
+  refreshToken?: string;
+  sucursalActivaId?: string;
 }
 
 export type RecoveryChannel = 'auto' | 'email' | 'whatsapp';
