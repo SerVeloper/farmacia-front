@@ -47,11 +47,17 @@ function handleKeydown(e: KeyboardEvent) {
         @keydown="handleKeydown"
       >
         <div
-          :class="['w-full bg-[var(--color-surface)] rounded-xl shadow-2xl', sizeClasses[size || 'md']]"
+          :class="[
+            'w-full bg-[var(--color-surface)] rounded-xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden',
+            sizeClasses[size || 'md'],
+          ]"
           role="dialog"
           aria-modal="true"
         >
-          <div v-if="title" class="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
+          <div
+            v-if="title"
+            class="shrink-0 flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]"
+          >
             <h2 class="text-lg font-semibold text-[var(--color-text-primary)]">{{ title }}</h2>
             <button
               @click="emit('close')"
@@ -62,10 +68,13 @@ function handleKeydown(e: KeyboardEvent) {
               </svg>
             </button>
           </div>
-          <div class="p-6">
+          <div class="flex-1 min-h-0 p-6 overflow-y-auto overscroll-contain">
             <slot />
           </div>
-          <div v-if="$slots.footer" class="px-6 py-4 border-t border-[var(--color-border)] bg-[var(--color-bg)] rounded-b-xl">
+          <div
+            v-if="$slots.footer"
+            class="shrink-0 px-6 py-4 border-t border-[var(--color-border)] bg-[var(--color-bg)] rounded-b-xl"
+          >
             <slot name="footer" />
           </div>
         </div>
