@@ -19,12 +19,16 @@ export interface VentaCatalogoProducto {
  * R6: el request de venta NO acepta seleccion de lote. El backend asigna
  * automaticamente por FEFO (vencimiento ASC, lote_id ASC) e incluye vencidos.
  * `VentaCreateItemDto` no debe crecer con `loteId`/`numeroLote`.
+ *
+ * venta-de-servicios: el item es de PRODUCTO o de SERVICIO con exactamente
+ * UNO de los dos ids (uniones discriminadas: la corazonada es que enviar
+ * `productoId` y `servicioId` juntos, o ninguno, no compile). El descuento
+ * monetario aplica a ambos origenes; el lote y el stock solo al producto.
  */
-export interface VentaCreateItemDto {
-  productoId: string;
-  cantidad: number;
-  descuentoMonto?: number;
-}
+export type VentaCreateItemDto = { cantidad: number; descuentoMonto?: number } & (
+  | { productoId: string; servicioId?: undefined }
+  | { productoId?: undefined; servicioId: string }
+);
 
 /**
  * R5 / R6: asignacion hija de un `VentaItem` hacia un lote (FEFO multi-lote).
@@ -116,13 +120,17 @@ export interface VentaResumen {
 
 export interface VentaDetalleItem {
   id: string;
-  productoId: string;
+  /** `null` cuando el item es de servicio (solo existe `servicioId`). */
+  productoId: string | null;
+  /** venta-de-servicios: presente solo en items de servicio. */
+  servicioId?: string | null;
   cantidad: number;
   precioUnitario: number;
   descuentoMonto: number;
   subtotal: number;
   nombreProducto: string;
-  codigoProducto: string;
+  /** `null` en items de servicio: el servicio no tiene codigo de catalogo. */
+  codigoProducto: string | null;
   /**
    * R5 / R6: asignaciones FEFO del item en `items[].asignaciones` (canonical).
    * Vacio/ausente para no medicamentos (R10).

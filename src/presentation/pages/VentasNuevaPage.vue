@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue';
 
 import { useAuthStore } from '@/application/stores/auth.store';
+import { useServicioStore } from '@/application/stores/servicio.store';
 import { useToastStore } from '@/application/stores/toast.store';
 import { useVentaStore } from '@/application/stores/venta.store';
 import {
@@ -12,24 +13,33 @@ import {
   normalizarAsignaciones,
   normalizarResumenVencimientos,
 } from '@/application/composables/useAlertasVencimiento';
+import type { Servicio } from '@/domain/types/servicio';
 import type {
   CreateVentaDto,
   VentaAlertaVencimiento,
   VentaAsignacionLote,
   VentaCatalogoProducto,
+  VentaCreateItemDto,
   VentaDetalle,
   VentaMetodoPago,
 } from '@/domain/types/venta';
 import TableSkeleton from '@/presentation/components/common/TableSkeleton.vue';
 
+/**
+ * venta-de-servicios: el carrito acepta ambos origenes con exactamente UNO
+ * de `productoId` / `servicioId`. Un item de servicio NO tiene stock
+ * (`stockActual: null`) ni codigo de catalogo (`codigo: null`), no tiene
+ * alertas de vencimiento, y su descuento monetario SI aplica.
+ */
 interface CartItem {
-  productoId: string;
-  codigo: string;
+  productoId?: string;
+  servicioId?: string;
+  codigo?: string | null;
   nombre: string;
   precioVenta: number;
-  stockActual: number;
+  stockActual?: number | null;
   cantidad: number;
-  descuentoMonto: number;
+  descuentoMonto?: number;
   /** R9: avisos informativos del producto en la sucursal activa. No bloquean. */
   alertas: VentaAlertaVencimiento[];
 }
@@ -48,6 +58,7 @@ type CobroMetodo = VentaMetodoPago | 'mixto';
 const authStore = useAuthStore();
 const toast = useToastStore();
 const ventaStore = useVentaStore();
+const servicioStore = useServicioStore();
 
 /** R1.6 / R11: conflicto de reconciliacion de saldos de lote (409). */
 const conflictoReconciliacion = ref('');
@@ -67,6 +78,11 @@ const isClienteDropdownOpen = ref(false);
 const clienteSearchTerm = ref('');
 const selectedClienteId = ref('');
 const clienteValidationMessage = ref('');
+
+/** venta-de-servicios: selector Productos | Servicios del panel derecho. */
+type CatalogTab = 'productos' | 'servicios';
+const catalogTab = ref<CatalogTab>('productos');
+const servicioSearchTerm = ref('');
 
 const clienteForm = reactive({
   nombre: '',
@@ -111,6 +127,21 @@ const clientesFiltrados = computed(() => {
   });
 });
 
+/**
+ * venta-de-servicios: lista de servicios ACTIVOS. El store es global (sin
+ * sucursal) y una sola llamada a `fetchServicios()` sin argumentos trae el
+ * listado completo; los inactivos se filtran en cliente.
+ */
+const serviciosActivos = computed(() =>
+  servicioStore.servicios.filter((servicio) => servicio.activo),
+);
+
+const serviciosFiltrados = computed(() => {
+  const query = normalizeText(servicioSearchTerm.value);
+  if (!query) return serviciosActivos.value;
+  return serviciosActivos.value.filter((servicio) => normalizeText(servicio.nombre).includes(query));
+});
+
 const cobroForm = reactive<{
   metodo: CobroMetodo;
   efectivo: number;
@@ -131,7 +162,7 @@ const subtotal = computed(() =>
 );
 
 const descuentoItems = computed(() =>
-  cart.value.reduce((sum, item) => sum + item.descuentoMonto, 0),
+  cart.value.reduce((sum, item) => sum + Number(item.descuentoMonto || 0), 0),
 );
 
 const total = computed(() => {
@@ -281,7 +312,8 @@ function addProduct(product: VentaCatalogoProducto) {
   const existing = cart.value.find((item) => item.productoId === productoId);
 
   if (existing) {
-    if (existing.cantidad < existing.stockActual) {
+    const stock = existing.stockActual;
+    if (stock === null || stock === undefined || existing.cantidad < stock) {
       existing.cantidad += 1;
     }
     existing.alertas = alertasDeProducto(product);
@@ -300,6 +332,34 @@ function addProduct(product: VentaCatalogoProducto) {
   });
 }
 
+/**
+ * venta-de-servicios: agrega un servicio ACTIVO al carrito. SIN validacion
+ * de stock (el servicio no toca inventario ni lote) y sin tope de cantidad:
+ * si ya esta en el carrito se incrementa; si no, entra con `stockActual: null`
+ * y `codigo: null`. El descuento monetario aplica igual que en productos.
+ */
+function addServicio(servicio: Servicio) {
+  if (!servicio.id || servicio.activo === false) return;
+
+  const existing = cart.value.find((item) => item.servicioId === servicio.id);
+
+  if (existing) {
+    existing.cantidad += 1;
+    return;
+  }
+
+  cart.value.push({
+    servicioId: servicio.id,
+    codigo: null,
+    nombre: servicio.nombre,
+    precioVenta: Number(servicio.precioVenta || 0),
+    stockActual: null,
+    cantidad: 1,
+    descuentoMonto: 0,
+    alertas: [],
+  });
+}
+
 /** R9: normaliza los avisos del catalogo sin inventar cortes ni fechas. */
 function alertasDeProducto(product: VentaCatalogoProducto): VentaAlertaVencimiento[] {
   return normalizarAlertasVencimiento(product.alertasVencimiento).map((alerta) => ({
@@ -309,8 +369,15 @@ function alertasDeProducto(product: VentaCatalogoProducto): VentaAlertaVencimien
   }));
 }
 
+/** R9: los items de servicio no tienen alertas de vencimiento. */
 function alertasDeLinea(item: CartItem): VentaAlertaVencimiento[] {
+  if (!item.productoId) return [];
   return item.alertas.filter((alerta) => !alerta.productoId || alerta.productoId === item.productoId);
+}
+
+/** venta-de-servicios: key generica para el carrito (producto o servicio). */
+function keyDeItem(item: CartItem): string {
+  return item.productoId ?? item.servicioId ?? item.nombre;
 }
 
 /** Badge informativo; nunca deshabilita la linea ni el producto. */
@@ -332,8 +399,9 @@ const resumenCarrito = computed(() =>
   normalizarResumenVencimientos(null, alertasCarrito.value),
 );
 
-function removeItem(productoId: string) {
-  cart.value = cart.value.filter((item) => item.productoId !== productoId);
+/** venta-de-servicios: elimina por key generica (productoId ?? servicioId). */
+function removeItem(key: string) {
+  cart.value = cart.value.filter((item) => keyDeItem(item) !== key);
 }
 
 function openCobroModal() {
@@ -354,18 +422,51 @@ function resetCobroForm() {
   cobroForm.referencia = '';
 }
 
+/**
+ * venta-de-servicios: alterna el panel derecho. Al entrar en "Servicios"
+ * se carga el catalogo global UNA VEZ (si el store ya trajo datos o está
+ * cargando, no se refetcha: fetchServicios() sin argumentos devuelve la
+ * lista completa y no pisa la paginación de ServiciosPage).
+ */
+async function seleccionarTab(tab: CatalogTab) {
+  catalogTab.value = tab;
+  if (
+    tab === 'servicios' &&
+    servicioStore.servicios.length === 0 &&
+    !servicioStore.loading
+  ) {
+    await servicioStore.fetchServicios();
+  }
+}
+
+/** venta-de-servicios: construye el item del payload con UNO de los dos ids. */
+function buildItemPayload(item: CartItem): VentaCreateItemDto | null {
+  const cantidad = item.cantidad;
+  const descuentoMonto = Number(item.descuentoMonto || 0);
+
+  if (item.servicioId) {
+    return { servicioId: item.servicioId, cantidad, descuentoMonto };
+  }
+
+  if (item.productoId) {
+    return { productoId: item.productoId, cantidad, descuentoMonto };
+  }
+
+  return null;
+}
+
 async function confirmCobroAndSubmit() {
   if (!canConfirmCobro.value || !sucursalActivaId.value) return;
 
   const payload: CreateVentaDto = {
     sucursalId: sucursalActivaId.value,
     descuentoGlobal: Number(descuentoGlobal.value || 0),
-    // R6: el request NO lleva lote; el backend asigna por FEFO.
-    items: cart.value.map((item) => ({
-      productoId: item.productoId,
-      cantidad: item.cantidad,
-      descuentoMonto: Number(item.descuentoMonto || 0),
-    })),
+    // R6: el request NO lleva lote; el backend asigna por FEFO (productos).
+    // venta-de-servicios: los items de servicio van con `servicioId` (sin lote,
+    // sin stock) y los de producto con `productoId`.
+    items: cart.value
+      .map((item) => buildItemPayload(item))
+      .filter((item): item is VentaCreateItemDto => item !== null),
     pagos: buildPagos(),
   };
 
@@ -440,7 +541,7 @@ function consolidarAvisosVencimientos(venta: VentaDetalle | null): VentaAlertaVe
       if (yaInformado) continue;
 
       avisos.push({
-        productoId: item.productoId,
+        productoId: item.productoId ?? '',
         nombreProducto: item.nombreProducto,
         loteId: asignacion.loteId,
         numeroLote: asignacion.numeroLote,
@@ -713,15 +814,15 @@ function saveClienteLocal() {
             </tbody>
 
             <tbody v-else>
-              <tr v-for="item in cart" :key="item.productoId">
-                <td>{{ item.stockActual }}</td>
+              <tr v-for="item in cart" :key="keyDeItem(item)">
+                <td>{{ item.stockActual ?? '—' }}</td>
 
                 <td class="w-cantidad">
                   <input
                     v-model.number="item.cantidad"
                     type="number"
                     min="1"
-                    :max="item.stockActual"
+                    :max="item.servicioId ? undefined : (item.stockActual ?? undefined)"
                     class="table-input"
                   />
                 </td>
@@ -763,7 +864,7 @@ function saveClienteLocal() {
                 <td>
                   {{
                     item.precioVenta * item.cantidad > 0
-                      ? ((item.descuentoMonto / (item.precioVenta * item.cantidad)) * 100).toFixed(2)
+                      ? ((Number(item.descuentoMonto || 0) / (item.precioVenta * item.cantidad)) * 100).toFixed(2)
                       : '0.00'
                   }}
                 </td>
@@ -775,7 +876,7 @@ function saveClienteLocal() {
                 </td>
 
                 <td>
-                  <button class="remove-btn" @click="removeItem(item.productoId)">
+                  <button class="remove-btn" @click="removeItem(keyDeItem(item))">
                     ✕
                   </button>
                 </td>
@@ -877,16 +978,44 @@ function saveClienteLocal() {
       <!-- RIGHT PANEL -->
       <div class="panel panel-right">
         <div class="border-b border-[var(--color-border)] p-1.5">
+          <!-- venta-de-servicios: selector Productos | Servicios -->
+          <div class="catalog-tabs">
+            <button
+              type="button"
+              class="catalog-tab"
+              :class="{ active: catalogTab === 'productos' }"
+              @click="seleccionarTab('productos')"
+            >
+              Productos
+            </button>
+            <button
+              type="button"
+              class="catalog-tab"
+              :class="{ active: catalogTab === 'servicios' }"
+              @click="seleccionarTab('servicios')"
+            >
+              Servicios
+            </button>
+          </div>
+
           <input
+            v-if="catalogTab === 'productos'"
             v-model="searchTerm"
             type="text"
             placeholder="Buscar Producto"
             class="pos-input"
           />
+          <input
+            v-else
+            v-model="servicioSearchTerm"
+            type="text"
+            placeholder="Buscar Servicio"
+            class="pos-input"
+          />
         </div>
 
         <div class="panel-table-wrapper">
-          <table class="pos-table">
+          <table v-if="catalogTab === 'productos'" class="pos-table">
             <thead>
               <tr>
                 <th class="text-left">CÓDIGO | DESCRIPCIÓN</th>
@@ -942,6 +1071,51 @@ function saveClienteLocal() {
                 </td>
                 <td>{{ money(item.precioVenta) }}</td>
                 <td>{{ item.stockActual }}</td>
+                <td>-</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- venta-de-servicios: catalogo global de servicios ACTIVOS. -->
+          <table v-else class="pos-table">
+            <thead>
+              <tr>
+                <th class="text-left">SERVICIO</th>
+                <th>PRECIO</th>
+                <th>UNIDAD</th>
+                <th>VNC</th>
+              </tr>
+            </thead>
+
+            <tbody v-if="servicioStore.loading">
+              <tr>
+                <td colspan="4" class="table-skeleton-cell">
+                  <TableSkeleton :columns="4" :rows="6" />
+                </td>
+              </tr>
+            </tbody>
+
+            <tbody v-else-if="serviciosFiltrados.length === 0">
+              <tr class="empty-row">
+                <td colspan="4">No hay servicios activos</td>
+              </tr>
+            </tbody>
+
+            <tbody v-else>
+              <tr
+                v-for="servicio in serviciosFiltrados"
+                :key="servicio.id"
+                class="catalog-row"
+                @dblclick="addServicio(servicio)"
+              >
+                <td class="text-left">
+                  <div class="catalog-product">
+                    <span class="catalog-code">Servicio</span>
+                    <span>{{ servicio.nombre }}</span>
+                  </div>
+                </td>
+                <td>{{ money(servicio.precioVenta) }}</td>
+                <td>—</td>
                 <td>-</td>
               </tr>
             </tbody>
@@ -1495,6 +1669,29 @@ function saveClienteLocal() {
 }
 
 .method-btn.active {
+  background: #6b5be6;
+  border-color: #8174ff;
+  color: #fff;
+}
+
+/* venta-de-servicios: selector Productos | Servicios del panel derecho. */
+.catalog-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.catalog-tab {
+  height: 30px;
+  border: 1px solid #46506f;
+  background: #1a2442;
+  color: #cfd8f3;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.catalog-tab.active {
   background: #6b5be6;
   border-color: #8174ff;
   color: #fff;

@@ -80,6 +80,12 @@ const router = createRouter({
       meta: secureMeta({ modulo: 'inventario', accion: 'ver' }),
     },
     {
+      path: '/inventario/servicios',
+      name: 'inventario-servicios',
+      component: () => import('@/presentation/pages/ServiciosPage.vue'),
+      meta: secureMeta({ modulo: 'inventario', accion: 'ver' }),
+    },
+    {
       path: '/compras/compras',
       name: 'compras-compras',
       component: () => import('@/presentation/pages/ComprasPage.vue'),
